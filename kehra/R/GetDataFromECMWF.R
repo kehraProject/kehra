@@ -32,12 +32,12 @@ GetDataFromECMWF <- function(db, points, years = 1981:2014,
   myVARdf <- data.frame(matrix(NA, ncol = 3, nrow = 0))
   names(myVARdf) <- c("datetime", "SiteID", var)
 
+  pointsSP <- SpatialPoints(points[, c('Longitude', 'Latitude')],
+                            proj4string=CRS('+proj=longlat +datum=WGS84'))
+
   for (year in years){
 
     print(year)
-
-    pointsSP <- SpatialPoints(points[, c('Longitude', 'Latitude')],
-                              proj4string=CRS('+proj=longlat +datum=WGS84'))
 
     # Set name of file containing UVT for given year
     fname <- paste(path, "/", prefix, year, ".nc", sep="")
@@ -49,7 +49,8 @@ GetDataFromECMWF <- function(db, points, years = 1981:2014,
     # Dates vector
     # library(stringr)
     startH <- str_pad(paste(timestep,":00", sep =""), 5, pad = "0")
-    lengthOut <- 24/timestep * (yearDays(as.Date("1991-02-01")) + 1)
+    nDays <- yearDays(as.Date(paste(year, "-02-01", sep=""))) + 1
+    lengthOut <- 24/timestep * nDays
 
     dates <- seq(as.POSIXlt(paste(year,"-01-01 ", startH, sep = ""),
                             format = "%Y-%m-%d %H:%M"),
