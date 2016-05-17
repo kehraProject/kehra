@@ -30,7 +30,7 @@ Get data from ECMWF ERA_Interim
 Possible variables names are: "t2m" (2m temperature, in K), "u10" (10 metres wind U component, in m/s), "v10" (10 metres wind V component, in m/s), "tp" (total precipitation, in m), "blh" (boundary layer height, in m), "ssr" (surface net solar radiation, in W/m2s).
 }
 \examples{
-# GetDataFromECMWF(u, v)
+# GetDataFromECMWF(db, points, years = 1981:2014, var = "t2m", prefix = "", timestep = 6)
 
 }
 

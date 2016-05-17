@@ -10,10 +10,10 @@
 #' @export
 #'
 #' @examples
-#' # windDir(u, v)
+#' # windDirection(u, v)
 #'
 
-windDir <- function(u, v) {
+windDirection <- function(u, v) {
 
   if (is.na(v) | is.na(u)) {
 
