@@ -16,7 +16,7 @@
 #' @export
 #'
 #' @examples
-#' # GetDataFromECMWF(u, v)
+#' # GetDataFromECMWF(db, points, years = 1981:2014, var = "t2m", prefix = "", timestep = 6)
 #'
 
 GetDataFromECMWF <- function(db, points, years = 1981:2014,
