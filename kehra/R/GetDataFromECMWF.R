@@ -6,8 +6,9 @@
 #' @param points are lat/lon coordinates of points (e.g. stations)
 #' @param years years to retrieve data for
 #' @param var variable to retrieve
-#' @param prefix string starting netcdf file name
 #' @param timestep time step in hours (e.g. 1, 3, 6, 12, 24)
+#' @param prefix string starting netcdf file name
+#' @param path folder path where netcdf files are stored
 #'
 #' @details Possible variables names are: "t2m" (2m temperature, in K), "u10" (10 metres wind U component, in m/s), "v10" (10 metres wind V component, in m/s), "tp" (total precipitation, in m), "blh" (boundary layer height, in m), "ssr" (surface net solar radiation, in W/m2s).
 #'
@@ -16,11 +17,13 @@
 #' @export
 #'
 #' @examples
-#' # GetDataFromECMWF(db, points, years = 1981:2014, var = "t2m", prefix = "", timestep = 6)
+#' # GetDataFromECMWF(db, points, years = 1981:2014, var = "t2m",
+#' #                  timestep = 6, prefix = "", path = "~")
 #'
 
 GetDataFromECMWF <- function(db, points, years = 1981:2014,
-                             var = "t2m", prefix = "", timestep = 6){
+                             var = "t2m", timestep = 6,
+                             prefix = "", path = "~"){
 
   # library(Hmisc)
   # points <- stations
@@ -37,7 +40,7 @@ GetDataFromECMWF <- function(db, points, years = 1981:2014,
                               proj4string=CRS('+proj=longlat +datum=WGS84'))
 
     # Set name of file containing UVT for given year
-    fname <- paste("~/kehra/data/Climate/", prefix, year, ".nc", sep="")
+    fname <- paste(path, "/", prefix, year, ".nc", sep="")
 
     # Extract variable at the given points and set the length of dates vectors
     myVARgrid <- rotate(brick(x = fname, varname = var))
