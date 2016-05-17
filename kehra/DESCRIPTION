@@ -1,0 +1,12 @@
+Package: kehra
+Type: Package
+Title: Collection of utility functions used in the KEHRA project
+Version: 0.1
+Date: 2016-05-17
+Author: Claudia Vitolo
+Maintainer: Claudia Vitolo <cvitolodev@gmail.com>
+Description: Collection of utility functions used in the KEHRA project. It refers to the multidimensional analysis of pollution and health.
+Depends: R (>= 2.14.0)
+Imports: Hmisc, raster, reshape2, stringr, sp
+License: GPL-3
+RoxygenNote: 5.0.1

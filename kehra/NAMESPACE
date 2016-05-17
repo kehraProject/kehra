@@ -1,0 +1,5 @@
+importFrom(Hmisc, yearDays)
+importFrom(raster, rotate, brick, extract)
+importFrom(reshape2, melt)
+importFrom(stringr, str_pad)
+importFrom(sp, SpatialPoints, CRS)
