@@ -49,7 +49,7 @@ GetDataFromECMWF <- function(db, points, years = 1981:2014,
     # Dates vector
     # library(stringr)
     startH <- str_pad(paste(timestep,":00", sep =""), 5, pad = "0")
-    nDays <- yearDays(as.Date(paste(year, "-02-01", sep=""))) + 1
+    nDays <- yearDays(as.Date(paste(year, "-02-01", sep="")))
     lengthOut <- 24/timestep * nDays
 
     dates <- seq(as.POSIXlt(paste(year,"-01-01 ", startH, sep = ""),
