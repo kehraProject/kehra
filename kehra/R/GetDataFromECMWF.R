@@ -2,7 +2,6 @@
 #'
 #' @description Get data from ECMWF ERA_Interim
 #'
-#' @param db dataframe to populate with info from ERA-Interim
 #' @param points are lat/lon coordinates of points (e.g. stations)
 #' @param years years to retrieve data for
 #' @param var variable to retrieve
@@ -12,21 +11,27 @@
 #'
 #' @details Possible variables names are: "t2m" (2m temperature, in K), "u10" (10 metres wind U component, in m/s), "v10" (10 metres wind V component, in m/s), "tp" (total precipitation, in m), "blh" (boundary layer height, in m), "ssr" (surface net solar radiation, in W/m2s).
 #'
-#' @return updated db
+#' @return time series variable
 #'
 #' @export
 #'
 #' @examples
-#' # GetDataFromECMWF(db, points, years = 1981:2014, var = "t2m",
+#' # GetDataFromECMWF(points, years = 1981:2014, var = "t2m",
 #' #                  timestep = 6, prefix = "", path = "~")
 #'
 
-GetDataFromECMWF <- function(db, points, years = 1981:2014,
+GetDataFromECMWF <- function(points, years = 1981:2014,
                              var = "t2m", timestep = 6,
                              prefix = "", path = "~"){
 
+  # TEST
   # library(Hmisc)
-  # points <- stations
+  # library(sp)
+  # library(raster)
+  # library(ncdf4)
+  # prefix = "UVT"
+  # path = "~/Documents/"
+  # points <- readRDS("~/Documents/stationsKEHRA.rds")
   # year <- 1991
 
   myVARdf <- data.frame(matrix(NA, ncol = 3, nrow = 0))
@@ -49,7 +54,7 @@ GetDataFromECMWF <- function(db, points, years = 1981:2014,
     # Dates vector
     # library(stringr)
     startH <- str_pad(paste(timestep,":00", sep =""), 5, pad = "0")
-    nDays <- yearDays(as.Date(paste(year, "-02-01", sep="")))
+    nDays <- yearDays(as.Date(paste(year, "-01-01", sep="")))
     lengthOut <- 24/timestep * nDays
 
     dates <- seq(as.POSIXlt(paste(year,"-01-01 ", startH, sep = ""),
