@@ -4,24 +4,24 @@
 \alias{GetDataFromECMWF}
 \title{Get data from ECMWF ERA_Interim}
 \usage{
-GetDataFromECMWF(db, points, years = 1981:2014, var = "t2m", prefix = "",
-  timestep = 6)
+GetDataFromECMWF(points, years = 1981:2014, var = "t2m", timestep = 6,
+  prefix = "", path = "~")
 }
 \arguments{
-\item{db}{dataframe to populate with info from ERA-Interim}
-
 \item{points}{are lat/lon coordinates of points (e.g. stations)}
 
 \item{years}{years to retrieve data for}
 
 \item{var}{variable to retrieve}
 
+\item{timestep}{time step in hours (e.g. 1, 3, 6, 12, 24)}
+
 \item{prefix}{string starting netcdf file name}
 
-\item{timestep}{time step in hours (e.g. 1, 3, 6, 12, 24)}
+\item{path}{folder path where netcdf files are stored}
 }
 \value{
-updated db
+time series variable
 }
 \description{
 Get data from ECMWF ERA_Interim
@@ -30,7 +30,8 @@ Get data from ECMWF ERA_Interim
 Possible variables names are: "t2m" (2m temperature, in K), "u10" (10 metres wind U component, in m/s), "v10" (10 metres wind V component, in m/s), "tp" (total precipitation, in m), "blh" (boundary layer height, in m), "ssr" (surface net solar radiation, in W/m2s).
 }
 \examples{
-# GetDataFromECMWF(db, points, years = 1981:2014, var = "t2m", prefix = "", timestep = 6)
+# GetDataFromECMWF(points, years = 1981:2014, var = "t2m",
+#                  timestep = 6, prefix = "", path = "~")
 
 }
 

@@ -7,6 +7,6 @@ Author: Claudia Vitolo
 Maintainer: Claudia Vitolo <cvitolodev@gmail.com>
 Description: Collection of utility functions used in the KEHRA project. It refers to the multidimensional analysis of pollution and health.
 Depends: R (>= 2.14.0)
-Imports: Hmisc, raster, reshape2, stringr, sp
+Imports: Hmisc, raster, reshape2, stringr, sp, xts, zoo
 License: GPL-3
 RoxygenNote: 5.0.1
