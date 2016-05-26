@@ -10,15 +10,15 @@
 #' @export
 #'
 #' @examples
-#' # FillMissingValues(clima, maxgap = 6)
+#' # FillMissingValues(clima)
 #'
 
-FillMissingValues <- function(df, maxgap){
+FillMissingValues <- function(df, maxgap = 12){
 
   # library(dplyr)
   # library(xts)
   # library(zoo)
-  # df <- clima
+  # df <- t2m; maxgap = 12
   # site <- as.character(unique(df$SiteID))[1]
 
   newDF <- data.frame(matrix(NA, nrow = 0, ncol= 3))
@@ -31,19 +31,7 @@ FillMissingValues <- function(df, maxgap){
     siteROWS <- which(df$SiteID == site)
     dfg <- df[siteROWS, ]
 
-    datetime <- seq.POSIXt(as.POSIXlt(head(dfg$datetime, n = 1)),
-                           as.POSIXlt(tail(dfg$datetime, n = 1)),
-                           by = "hour")
-    emptyTS <- xts(rep(NA, length(datetime)), order.by = datetime)
-
-    siteDF <- xts(dfg[, 3], order.by = as.POSIXlt(dfg$datetime))
-    siteDFextented <- merge(emptyTS, siteDF)[,2]
-
-    x <- na.approx(object = siteDFextented, maxgap = maxgap, na.rm = FALSE)
-
-    newDF <- rbind(newDF, data.frame(cbind(index(x),
-                                           rep(site, length(x)),
-                                           coredata(x))))
+    x <- FillMissingValues_singleSite(dfg, maxgap)
 
   }
 
@@ -53,3 +41,24 @@ FillMissingValues <- function(df, maxgap){
 
 }
 
+
+FillMissingValues_singleSite <- function(siteTS, maxgap){
+
+  datetime <- seq.POSIXt(as.POSIXlt(head(siteTS$datetime, n = 1)),
+                         as.POSIXlt(tail(siteTS$datetime, n = 1)),
+                         by = "hour")
+  emptyTS <- xts(rep(NA, length(datetime)), order.by = datetime)
+
+  siteDF <- xts(siteTS[, 3], order.by = as.POSIXlt(siteTS$datetime))
+  siteDFextented <- merge(emptyTS, siteDF)[,2]
+
+  x <- na.approx(object = siteDFextented, maxgap = maxgap, na.rm = FALSE)
+
+  newDF <- rbind(newDF,
+                 cbind(as.character(index(x)),
+                       rep(site, length(x)),
+                       coredata(x)))
+
+  return(x)
+
+}
