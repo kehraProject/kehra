@@ -33,6 +33,11 @@ FillMissingValues <- function(df, maxgap = 12){
 
     x <- FillMissingValues_singleSite(dfg, maxgap)
 
+    newDF <- rbind(newDF,
+                   cbind(as.character(index(x)),
+                         rep(site, length(x)),
+                         coredata(x)))
+
   }
 
   names(newDF) <- names(df)
@@ -53,11 +58,6 @@ FillMissingValues_singleSite <- function(siteTS, maxgap){
   siteDFextented <- merge(emptyTS, siteDF)[,2]
 
   x <- na.approx(object = siteDFextented, maxgap = maxgap, na.rm = FALSE)
-
-  newDF <- rbind(newDF,
-                 cbind(as.character(index(x)),
-                       rep(site, length(x)),
-                       coredata(x)))
 
   return(x)
 
