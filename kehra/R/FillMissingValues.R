@@ -21,6 +21,12 @@ FillMissingValues <- function(df, maxgap = 12){
   # df <- t2m; maxgap = 12
   # site <- as.character(unique(df$SiteID))[1]
 
+  # TODO: Implement parallel version
+  # library(parallel)
+  # Use all the available cores
+  # nCores <- detectCores() - 1
+  # newDF <- mclapply(...)
+
   newDF <- data.frame(matrix(NA, nrow = 0, ncol= 3))
 
   # For each site create a time series
@@ -29,14 +35,15 @@ FillMissingValues <- function(df, maxgap = 12){
     print(site)
 
     siteROWS <- which(df$SiteID == site)
-    dfg <- df[siteROWS, ]
+    siteTS <- df[siteROWS, ]
 
-    x <- FillMissingValues_singleSite(dfg, maxgap)
+    x <- FillMissingValues_singleSite(siteTS, maxgap)
 
-    newDF <- rbind(newDF,
-                   cbind(as.character(index(x)),
-                         rep(site, length(x)),
-                         coredata(x)))
+    siteDF1 <- data.frame(as.character(index(x)),
+                          rep(site, length(x)),
+                          coredata(x), stringsAsFactors = FALSE)
+
+    newDF <- rbind(newDF, siteDF1, stringsAsFactors = FALSE)
 
   }
 
