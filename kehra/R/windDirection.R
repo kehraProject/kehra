@@ -15,15 +15,20 @@
 
 windDirection <- function(u, v) {
 
-  if (is.na(v) | is.na(u)) {
+  # Convert u and v to numeric
+  # (as.character is necessary to avoid problems when converting from factors)
+  uN <- as.numeric(as.character(u))
+  vN <- as.numeric(as.character(v))
+
+  if (is.na(vN) | is.na(uN)) {
 
     wd <- NA
 
   }else{
 
-    if(v > 0)         wd <- ((180 / pi) * atan(u/v) + 180)
-    if(u < 0 & v < 0) wd <- ((180 / pi) * atan(u/v) + 0)
-    if(u > 0 & v < 0) wd <- ((180 / pi) * atan(u/v) + 360)
+    if(vN > 0)         wd <- ((180 / pi) * atan(uN/vN) + 180)
+    if(uN < 0 & vN < 0) wd <- ((180 / pi) * atan(uN/vN) + 0)
+    if(uN > 0 & vN < 0) wd <- ((180 / pi) * atan(uN/vN) + 360)
 
   }
 
