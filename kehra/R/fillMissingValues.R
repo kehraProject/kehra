@@ -2,18 +2,20 @@
 #'
 #' @description Fill missing values
 #'
+#' @param id site id code
 #' @param df dataframe containing the timeseries in columns separated by ID (Header must follow this convention: column 1 = "datetime", column 2 = "SiteID", column 3 = "variable name"). df can be the result of GetDataFromECMWF().
 #' @param maxgap maximum gap to interpolate (e.g. 6 hours)
+#' @param parallel Bolean, if TRUE parallel jobs are allowed.
 #'
 #' @return updated df with infilled values
 #'
 #' @export
 #'
 #' @examples
-#' # FillMissingValues(clima)
+#' # fillMissingValues(clima)
 #'
 
-FillMissingValues <- function(df, maxgap = 12){
+fillMissingValues <- function(id, df, maxgap = 12, parallel = FALSE){
 
   # library(dplyr)
   # library(xts)
@@ -27,34 +29,45 @@ FillMissingValues <- function(df, maxgap = 12){
   # nCores <- detectCores() - 1
   # newDF <- mclapply(...)
 
-  newDF <- data.frame(matrix(NA, nrow = 0, ncol= 3))
+  # In case SiteID is a factor, convert it to characters
+  # id <- as.character(unique(df$SiteID))
 
-  # For each site create a time series
-  for (site in as.character(unique(df$SiteID))){
+  if (length(as.list(id)) == 0) {
 
-    print(site)
+    message("Please, enter valid id.")
+    stop
 
-    siteROWS <- which(df$SiteID == site)
-    siteTS <- df[siteROWS, ]
+  }else{
 
-    x <- FillMissingValues_singleSite(siteTS, maxgap)
+    if (parallel == FALSE){
 
-    siteDF1 <- data.frame(as.character(index(x)),
-                          rep(site, length(x)),
-                          coredata(x), stringsAsFactors = FALSE)
+      # multiple identification numbers
+      tsList <- lapply(X = as.list(id),
+                       FUN = fillMissingValues_internal, df, maxgap)
+      filledIn <- do.call(rbind.data.frame, tsList)
 
-    newDF <- rbind(newDF, siteDF1, stringsAsFactors = FALSE)
+    }else{
+
+      # this is the case of a single identification number
+      filledIn <- fillMissingValues_internal(id, df, maxgap)
+
+    }
 
   }
 
-  names(newDF) <- names(df)
+  names(filledIn) <- names(df)
 
-  return(newDF)
+  return(filledIn)
 
 }
 
 
-FillMissingValues_singleSite <- function(siteTS, maxgap){
+fillMissingValues_internal <- function(site, df, maxgap){
+
+  print(site)
+
+  siteROWS <- which(df$SiteID == site)
+  siteTS <- df[siteROWS, ]
 
   datetime <- seq.POSIXt(as.POSIXlt(head(siteTS$datetime, n = 1)),
                          as.POSIXlt(tail(siteTS$datetime, n = 1)),
@@ -66,6 +79,10 @@ FillMissingValues_singleSite <- function(siteTS, maxgap){
 
   x <- na.approx(object = siteDFextented, maxgap = maxgap, na.rm = FALSE)
 
-  return(x)
+  siteDF1 <- data.frame(as.character(index(x)),
+                        rep(site, length(x)),
+                        coredata(x), stringsAsFactors = FALSE)
+
+  return(siteDF1)
 
 }
