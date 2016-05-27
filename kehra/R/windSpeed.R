@@ -15,9 +15,13 @@
 
 windSpeed <- function(u, v) {
 
+  # Convert u and v to numeric
+  # (as.character is necessary to avoid problems when converting from factors)
   uN <- as.numeric(as.character(u))
   vN <- as.numeric(as.character(v))
 
-  sqrt(u^2 + v^2)
+  ws <- sqrt(uN^2 + vN^2)
+
+  return(ws)
 
 }
