@@ -4,10 +4,10 @@
 \alias{fillMissingValues}
 \title{Fill missing values}
 \usage{
-fillMissingValues(id, df, maxgap = 12, parallel = FALSE)
+fillMissingValues(ids, df, maxgap = 12, parallel = FALSE)
 }
 \arguments{
-\item{id}{site id code}
+\item{ids}{site identification codes}
 
 \item{df}{dataframe containing the timeseries in columns separated by ID (Header must follow this convention: column 1 = "datetime", column 2 = "SiteID", column 3 = "variable name"). df can be the result of GetDataFromECMWF().}
 
