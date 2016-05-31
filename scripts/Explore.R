@@ -54,19 +54,11 @@ rm(grouped, x, ind)
 # SPLIT THE DATASET INTO TRAINING AND TESTING SETS #############################
 ################################################################################
 
-indNoNA <- apply(df, 1, function(y) any(is.na(y)))
+# Training set contains all the data up to 2007, testing only data for 2008-14
+ind <- which(as.numeric(as.character(df$Year)) <= 2007)
 
-df_noNA <- df[!indNoNA,]
-saveRDS(df_noNA, "~/kehra/data/EnglandDB_noNA.rds")
-
-# Training set contains all the data up to 2010, testing only data for 2011-14
-ind <- which(as.numeric(as.character(df_noNA$Year)) <= 2010)
-
-training <- df_noNA[ind, ] # ~80% round(dim(training)[1]/dim(df_noNA)[1],2)
-testing <- df_noNA[-ind, ] # ~20% round(dim(testing)[1]/dim(df_noNA)[1],2)
+training <- df[ind, ] # ~77% round(dim(training)[1]/dim(df)[1],2)
+testing <- df[-ind, ] # ~23 round(dim(testing)[1]/dim(df)[1],2)
 
 saveRDS(training, "~/kehra/data/training.rds")
 saveRDS(testing, "~/kehra/data/testing.rds")
-
-rm(df_noNA, ind, testing)
-gc()
