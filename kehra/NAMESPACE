@@ -9,6 +9,6 @@ importFrom(xts, xts)
 
 export(windSpeed)
 export(windDirection)
-export(GetDataFromECMWF)
+export(pointInspection)
 export(fillMissingValues)
 export(getSeason)

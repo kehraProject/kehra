@@ -3,9 +3,10 @@
 #' @description Fill missing values
 #'
 #' @param ids site identification codes
-#' @param df dataframe containing the timeseries in columns separated by ID (Header must follow this convention: column 1 = "datetime", column 2 = "SiteID", column 3 = "variable name"). df can be the result of GetDataFromECMWF().
+#' @param df dataframe containing the timeseries in columns separated by ID (header must follow this convention: column 1 = "datetime", column 2 = "SiteID", column 3 = "variable name"). df can be the result of GetDataFromECMWF().
 #' @param maxgap maximum gap to interpolate (e.g. 6 hours)
-#' @param parallel Bolean, if TRUE parallel jobs are allowed.
+#' @param parallel Bolean, if TRUE parallel jobs are allowed
+#' @param formatDT format of the datetime variable
 #'
 #' @return updated df with infilled values
 #'
@@ -36,13 +37,13 @@ fillMissingValues <- function(ids, df, maxgap = 12, parallel = FALSE,
       
       # multiple identification numbers
       tsList <- lapply(X = as.list(ids),
-                       FUN = fillMissingValues_internal, df, maxgap)
+                       FUN = fillMissingValues_internal, df, maxgap, formatDT)
       filledIn <- do.call(rbind.data.frame, tsList)
       
     }else{
       
       # this is the case of a single identification number
-      filledIn <- fillMissingValues_internal(ids, df, maxgap)
+      filledIn <- fillMissingValues_internal(ids, df, maxgap, formatDT)
       # summary(filledIn); summary(siteTS)
       # head(filledIn); head(siteTS)
       
@@ -57,7 +58,7 @@ fillMissingValues <- function(ids, df, maxgap = 12, parallel = FALSE,
 }
 
 
-fillMissingValues_internal <- function(site, df, maxgap){
+fillMissingValues_internal <- function(site, df, maxgap, formatDT){
   
   print(site)
   

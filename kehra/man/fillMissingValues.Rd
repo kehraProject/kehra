@@ -4,16 +4,19 @@
 \alias{fillMissingValues}
 \title{Fill missing values}
 \usage{
-fillMissingValues(ids, df, maxgap = 12, parallel = FALSE)
+fillMissingValues(ids, df, maxgap = 12, parallel = FALSE,
+  formatDT = "\%d-\%m-\%Y \%H:\%M")
 }
 \arguments{
 \item{ids}{site identification codes}
 
-\item{df}{dataframe containing the timeseries in columns separated by ID (Header must follow this convention: column 1 = "datetime", column 2 = "SiteID", column 3 = "variable name"). df can be the result of GetDataFromECMWF().}
+\item{df}{dataframe containing the timeseries in columns separated by ID (header must follow this convention: column 1 = "datetime", column 2 = "SiteID", column 3 = "variable name"). df can be the result of GetDataFromECMWF().}
 
 \item{maxgap}{maximum gap to interpolate (e.g. 6 hours)}
 
-\item{parallel}{Bolean, if TRUE parallel jobs are allowed.}
+\item{parallel}{Bolean, if TRUE parallel jobs are allowed}
+
+\item{formatDT}{format of the datetime variable}
 }
 \value{
 updated df with infilled values
