@@ -23,8 +23,6 @@ importAURN <- function(site = "my1", year = 2009, pollutant = "all", hc = FALSE)
     },
     error = function(ex) {cat(x, "does not exist - ignoring that one.\n")})
     
-    closeAllConnections()
-    
   }
   
   

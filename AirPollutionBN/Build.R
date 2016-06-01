@@ -1,25 +1,31 @@
 # Check for missing dependencies and install them
-packs <- c("devtools", "plyr", "dplyr", "raster", "sp", "rgdal", "xts", "zoo",
-           "parallel")
-new.packages <- packs[!(packs %in% installed.packages()[,"Package"])]
-if(length(new.packages)) install.packages(new.packages)
+# packs <- c("devtools", "plyr", "dplyr", "raster", "sp", "rgdal", "xts", "zoo",
+#            "parallel")
+# new.packages <- packs[!(packs %in% installed.packages()[,"Package"])]
+# if(length(new.packages)) install.packages(new.packages)
+# rm(new.packages, packs)
 library(devtools)
+library(parallel)
+
+# INSTALL RDEFRA package
+# install_github("cvitolo/r_rdefra", subdir="rdefra")
+library(rdefra)
+
+# INSTALL OPENAIR package
+install_github('davidcarslaw/openair')
+library(openair)
+# load modified script
+source('~/r_kehra/AirPollutionBN/importAURN.R')
 
 # INSTALL KEHRA package
 # install_github("cvitolo/r_kehra", subdir = "kehra")
 library(kehra)
-library(parallel)
-
-# rm(new.packages, packs)
 
 ################################################################################
-# POLLUTION DATA ###############################################################
+# POLLUTION DATA (from the DEFRA UK-AIR website) ###############################
 ################################################################################
 
-# Pollution data in the UK is available from the DEFRA UK-AIR website
-# Get metadata from the rdefra package
-# install_github("cvitolo/r_rdefra", subdir="rdefra")
-library(rdefra)
+# Get metadata using the rdefra package
 data(stationsNew)
 stationsNew$Region <- NA
 
@@ -30,7 +36,6 @@ stationsNew <- stationsNew[!is.na(stationsNew$Latitude) |
 stationsNew <- stationsNew[,c("SiteID", "Site.Name", "Latitude", "Longitude",
                               "Altitude..m.", "Environment.Type", "Zone", 
                               "Region")]
-
 names(stationsNew) <- c("SiteID", "Site.Name", "Latitude", "Longitude",
                         "Altitude", "Environment.Type", "Zone", "Region")
 
@@ -66,88 +71,66 @@ for (reg in 1:length(Regions@data$NAME)){
   stations$Region[x] <- as.character(Regions@data$NAME[reg])
 }
 
-# Get time series
-library(rdefra)
-library(plyr)
-counter <- 0
-for (id in stations$SiteID){
-  print(id)
-  counter <- counter + 1
-  x <- get1Hdata(id, years = 1981:2014)
-  if (counter == 1){
-    myList <- x
-  }else{
-    myList <- rbind.fill(myList, x)
-  }
-}
+# Get time series using OPENAIR
+OPENAIRts <- importAURN(site = stations$SiteID, year = 1981:2014, 
+                        pollutant = c("pm10","pm2.5","no2","o3","so2","co"), 
+                        hc = FALSE)
 
 # How many stations actually have datasets?
-stations <- stations[which(stations$SiteID %in% unique(myList$site_id)),]
+stations <- stations[which(stations$SiteID %in% unique(OPENAIRts$SiteID)),]
 # saveRDS(stations, "~/kehra/data/Pollution/stations.rds")
-# stations <- readRDS("~/kehra/data/Pollution/stations.rds")
 
-# remove not relevant variables
-pollutionDB <-myList[,c("Date", "time", "site_id",
-                        "PM.sub.10..sub..particulate.matter..Hourly.measured.",
-                        "PM.sub.2.5..sub..particulate.matter..Hourly.measured.",
-                        "Nitrogen.dioxide", "Ozone", "Sulphur.dioxide", 
-                        "Carbon.monoxide")]
-# rm(myList)
-names(pollutionDB) <- c("Date","time","SiteID",
-                        "PM10","PM2.5","NO2","O3", "SO2", "CO")
-# str(pollutionDB)
-pollutionDB$Date <- as.character(pollutionDB$Date)
-pollutionDB$time <- as.character(pollutionDB$time)
-pollutionDB$datetime <- paste(pollutionDB$Date, " ", pollutionDB$time, sep = "")
+# Clean up OPENAIRts
+OPENAIRts <- OPENAIRts[, c("code", "date", "pm10", "pm2.5", "no2", "o3", "so2", "co")]
+names(OPENAIRts) <- c("SiteID", "datetime", "pm10", "pm2.5", "no2", "o3", "so2", "co")
+OPENAIRts$SiteID <- as.character(OPENAIRts$SiteID)
+OPENAIRts$datetime <- as.character(OPENAIRts$datetime)
+# saveRDS(pollution, "~/kehra/data/Pollution/pollutionTEMP.rds")
+# pollution <- readRDS("~/kehra/data/Pollution/pollutionTEMP.rds")
 
-# Keep only the relevant columns
-pollutionDB <- pollutionDB[,c("datetime", "SiteID", 
-                              "PM10","PM2.5", "NO2", "O3", "SO2", "CO")]
-
-# saveRDS(pollutionDB, "~/kehra/data/Pollution/pollutionTEMP.rds")
-# pollutionDB <- readRDS("~/kehra/data/Pollution/pollutionTEMP.rds")
+rm(OPENAIRts, PM10, PM10l, stations, stations2, reg, Regions, stationsSP, x, importAURN)
 
 # Infill missing values using linear interpolation (maxgap = 12)
 library(parallel)
 library(kehra)
-PM10l <- mclapply(X = unique(pollutionDB$SiteID),
+PM10l <- mclapply(X = unique(pollution$SiteID),
                   FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                  df = pollutionDB[, c("datetime", "SiteID", "PM10")],
+                  df = pollution[, c("datetime", "SiteID", "pm10")],
                   parallel = TRUE)
 PM10 <- do.call(rbind.data.frame, PM10l)
 rm(PM10l); head(PM10)
 
-PM25l <- mclapply(as.character(unique(pollutionDB$SiteID)),
+PM25l <- mclapply(as.character(unique(pollution$SiteID)),
                   FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                  pollutionDB[, c("datetime", "SiteID", "PM2.5")],
+                  pollution[, c("datetime", "SiteID", "pm2.5")],
                   parallel = TRUE)
 PM2.5 <- do.call(rbind.data.frame, PM25l)
 rm(PM25l)
 
-NO2l <- mclapply(as.character(unique(pollutionDB$SiteID)),
+NO2l <- mclapply(as.character(unique(pollution$SiteID)),
                  FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                 pollutionDB[, c("datetime", "SiteID", "NO2")],
+                 pollution[, c("datetime", "SiteID", "no2")],
                  parallel = TRUE)
 NO2 <- do.call(rbind.data.frame, NO2l)
 rm(NO2l)
 
-O3l <- mclapply(as.character(unique(pollutionDB$SiteID)),
+O3l <- mclapply(as.character(unique(pollution$SiteID)),
                 FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                pollutionDB[, c("datetime", "SiteID", "O3")],
+                pollution[, c("datetime", "SiteID", "o3")],
                 parallel = TRUE)
 O3 <- do.call(rbind.data.frame, O3l)
 rm(O3l)
 
-SO2l <- mclapply(as.character(unique(pollutionDB$SiteID)),
+SO2l <- mclapply(as.character(unique(pollution$SiteID)),
                  FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                 pollutionDB[, c("datetime", "SiteID", "SO2")],
+                 pollution[, c("datetime", "SiteID", "so2")],
                  parallel = TRUE)
 SO2 <- do.call(rbind.data.frame, SO2l)
 rm(SO2l)
 
-COl <- mclapply(as.character(unique(pollutionDB$SiteID)),
+COl <- mclapply(as.character(unique(pollution$SiteID)),
                 FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                pollutionDB[, c("datetime", "SiteID", "CO")],
+                pollution[, c("datetime", "SiteID", "co")],
                 parallel = TRUE)
 CO <- do.call(rbind.data.frame, COl)
 rm(COl)
@@ -158,6 +141,9 @@ pollution <- left_join(pollution, NO2, by=c("datetime", "SiteID"))
 pollution <- left_join(pollution, O3, by=c("datetime", "SiteID"))
 pollution <- left_join(pollution, SO2, by=c("datetime", "SiteID"))
 pollution <- left_join(pollution, CO, by=c("datetime", "SiteID"))
+
+# stations <- readRDS("~/kehra/data/Pollution/stations.rds")
+pollution <- left_join(pollution, stations, by = "SiteID")
 # saveRDS(pollution, "~/kehra/data/Pollution/pollution.rds")
 
 ################################################################################

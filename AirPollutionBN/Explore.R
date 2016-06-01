@@ -2,6 +2,24 @@
 df <- readRDS("~/kehra/data/EnglandDB.rds")
 
 ################################################################################
+# MAKE A MAP OF THE ACTIVE STATIONS ############################################
+################################################################################
+library(devtools)
+library(ggmap)
+
+# for theme_map
+source_gist("33baa3a79c5cfef0f6df")
+
+# Load data
+stations <- readRDS("~/kehra/data/Pollution/stations.rds")
+
+myMAP <- get_map("birmingham, uk",zoom=6)
+ggmap(myMAP)+
+  geom_point(data = data.frame(stations), aes(x = Longitude, y = Latitude),
+             alpha=0.5 , color = "red") +
+  xlab("Longitude") + ylab("Latitude")
+
+################################################################################
 # FIND OUT TEMPORAL COVERAGE ###################################################
 ################################################################################
 
@@ -97,7 +115,6 @@ x <- importMeta(source='aurn', all = TRUE)
 y <- importAURN(site = x$code, year = 1981:2014, pollutant = c("pm10","pm2.5","no2","o3","so2","co"), hc = FALSE)
 yy <- y[complete.cases(y),]
 
-stations <- readRDS("~/kehra/data/Pollution/stations.rds")
 w <- importAURN(site = stations$SiteID, year = 1981:2014, pollutant = c("pm10","pm2.5","no2","o3","so2","co"), hc = FALSE)
 ww <- w[complete.cases(w),] 
 names(ww) 
