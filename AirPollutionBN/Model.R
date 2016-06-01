@@ -1,5 +1,5 @@
 # Load the training set.
-df <- readRDS("~/kehra/data/training.rds")
+df <- readRDS("~/kehra/data/trainingComplete.rds")
 
 ################################################################################
 # LEARN THE BAYESIAN NETWORK USING BNLEARN #####################################
@@ -19,46 +19,6 @@ df <- readRDS("~/kehra/data/training.rds")
 # install.packages("bnlearn")
 library(bnlearn)
 
-# There is no support for latent variables in bnlearn, which means you have to 
-# manually introduce them, link them to observed values and impute the values 
-# with EM. Missing values in observed values can be handled in the same way;
-# the E step is predict() and the M step is model learning. 
-# Mixed categorical and continuous data are handled with
-# conditional Gaussian assumptions, so continuous variables cannot be
-# parents of discrete variables.
-
-# Initialise using the empty graph and complete observations.
-str(training)
-dag <- empty.graph(names(training))
-bn  <- bn.fit(dag, training[complete.cases(training), ])
-
-# Use expectation-maximisation (EM) to impute
-current <- training
-for (columnName in names(training)) {
-  
-  columnValues <- eval(parse(text=paste("current$", columnName, sep="")))
-  
-  if (any(is.na(columnValues))) {
-    
-    print(columnName)
-    
-    # E: replacing missing values with their (E)xpectation.
-    current[is.na(columnValues), columnName] <- predict(bn, 
-                                                        node = columnName, 
-                                                        current[is.na(columnValues),c(10:12)],
-                                                        method = "bayes-lw")
-    
-    # M: learning the model that (M)aximises the score with the current data.
-    # dag = hc(current)
-    # bn = bn.fit(dag, current)
-    
-  }
-  
-}
-
-# A better version would check for convergence in the model, but apart
-# from that the above is pretty much the vanilla EM you find in most textbooks.
-
 ################################################################################
 # LEARN THE BAYESIAN NETWORK USING PCALG (CAUSAL RELATIONSHIPS) ################
 ################################################################################
@@ -72,37 +32,15 @@ library(pcalg)
 require(Rgraphviz)
 
 # Only continuous variables:
-df00 <- training[, 10:34]
-# df00 <- df[!is.na(df$CVD60), c(1:4, 12, 13:22, 28, 30, 33, 34, 38, 42)]
-names(df00) <- c("Y", "M", "D", "T", "RID", 
-                 "LAT", "LON", "ALT", "WS", "WD", "O3",
-                 "SO2", "CO", "PM10", "PM25", "NO2", "TP", "BLH", "R", 
-                 "C60", "L60")
-# df00 <- df[!is.na(df$CVD60), c(4, 12, 15:22, 28, 30, 33, 34, 38)]
-str(df00)
-suffStat <- list(C = cor(df00, use="complete.obs"), n = nrow(df00))
-pc.fit0 <- pc(suffStat,
-              indepTest = gaussCItest, ## indep.test: partial correlations
-              alpha=0.005, labels = names(df00))
-
-################################################################################
-# Start SIMPLE!
-df00 <- df[!is.na(df$CVD60), c(12, 15:22, 28, 30, 33, 34, 38)]
-# df00 <- df[!is.na(df$CVD60), c(1:4, 12, 13:22, 28, 30, 33, 34, 38, 42)]
-names(df00) <- c("Y", "M", "D", "T", "RID", 
-                 "LAT", "LON", "ALT", "WS", "WD", "O3",
-                 "SO2", "CO", "PM10", "PM25", "NO2", "TP", "BLH", "R", 
-                 "C60", "L60")
-# df00 <- df[!is.na(df$CVD60), c(4, 12, 15:22, 28, 30, 33, 34, 38)]
-str(df00)
-suffStat <- list(C = cor(df00, use="complete.obs"), n = nrow(df00))
-pc.fit0 <- rfci(suffStat,
+df00 <- df[, 5:24]
+# suffStat <- list(C = cor(df, use="complete.obs"), n = nrow(df))
+suffStat <- list(C = cor(df00), n = nrow(df00))
+pc.fit0 <- fci(suffStat,
                 indepTest = gaussCItest, ## indep.test: partial correlations
                 alpha=0.005, labels = names(df00))
-# saveRDS(pc.fit0, "pcfit.rds")
 plot(pc.fit0, main = "Estimated CPDAG")
 
-# export pc.fit2 to bnlearn
+# export pc.fit to bnlearn
 res <- as.bn(pc.fit0@graph)
 
 library(igraph)

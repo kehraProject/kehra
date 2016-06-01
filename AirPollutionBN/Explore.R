@@ -97,7 +97,7 @@ x <- importMeta(source='aurn', all = TRUE)
 y <- importAURN(site = x$code, year = 1981:2014, pollutant = c("pm10","pm2.5","no2","o3","so2","co"), hc = FALSE)
 yy <- y[complete.cases(y),]
 
-stations <- readRDS("~/Documents/stationsKEHRA.rds")
+stations <- readRDS("~/kehra/data/Pollution/stations.rds")
 w <- importAURN(site = stations$SiteID, year = 1981:2014, pollutant = c("pm10","pm2.5","no2","o3","so2","co"), hc = FALSE)
 ww <- w[complete.cases(w),] 
 names(ww) 
@@ -111,7 +111,31 @@ ww$datetime <- as.character(ww$datetime)
 ww$SiteID <- as.character(ww$SiteID)
 str(clima)
 
-df1 <- left_join(ww, clima)
-df1 <- df1[complete.cases(df1),]
+df1 <- left_join(ww, clima, by = c("datetime", "SiteID"))
+df1 <- left_join(df1, stations, by = "SiteID")
+df1$Year <- format(as.POSIXlt(df1$datetime), "%Y")
+df1$Month <- format(as.POSIXlt(df1$datetime), "%m")
+df1$Day <- format(as.POSIXlt(df1$datetime), "%d")
+df1$Hour <- format(as.POSIXlt(df1$datetime), "%H")
+library(kehra)
+df1$Season <- getSeason(DATES = as.POSIXlt(df1$datetime))
+
+df1 <- df1[,c("SiteID", "Region", "Zone", "Environment.Type", "Latitude", "Longitude", "Altitude",
+              "Year", "Season", "Month", "Day", "Hour",
+              "t2m", "ws", "wd", "tp", "blh", "ssr",
+              "pm10", "pm2.5", "no2", "o3", "so2", "co")]
+str(df1)
+df1$Year <- as.numeric(df1$Year)
+season <- as.factor(df1$Season)
+levels(season) <- c(1,2,3,4) # 1 = "Fall", 2 = "Spring", 3 = "Summer", 4 = "Winter"
+df1$Season <- as.numeric(levels(season))[season]
+df1$Month <- as.numeric(df1$Month)
+df1$Day <- as.numeric(df1$Day)
+df1$Hour <- as.numeric(df1$Hour)
+
+names(df1) <- c("ID", "Reg", "Zone", "Type", "Lat", "Lon", "Alt",
+                "Year", "Sea", "Mon", "Day", "Hour",
+                "t2m", "ws", "wd", "tp", "blh", "ssr",
+                "pm10", "pm2.5", "no2", "o3", "so2", "co")
 
 saveRDS(df1, "~/kehra/data/trainingComplete.rds")
