@@ -62,3 +62,56 @@ testing <- df[-ind, ] # ~23 round(dim(testing)[1]/dim(df)[1],2)
 
 saveRDS(training, "~/kehra/data/training.rds")
 saveRDS(testing, "~/kehra/data/testing.rds")
+
+################################################################################
+# CLEAN UP TRAINING SET ########################################################
+################################################################################
+
+df <- readRDS("~/kehra/data/training.rds")
+
+any(is.na(df$t2m))
+dfclean <- df[-which(is.na(df$t2m)),]; rm(df)
+any(is.na(dfclean$ws))
+any(is.na(dfclean$wd))
+any(is.na(dfclean$tp))
+dfclean <- dfclean[-which(is.na(dfclean$tp)),]
+any(is.na(dfclean$blh))
+any(is.na(dfclean$ssr))
+
+any(is.na(dfclean$CVD00))
+dfclean <- dfclean[-which(is.na(dfclean$CVD00)),]
+any(is.na(dfclean$CVD20))
+any(is.na(dfclean$CVD40))
+any(is.na(dfclean$CVD60))
+
+df <- dfclean[complete.cases(dfclean[, c("PM10","PM2.5","NO2","O3","SO2","CO")]),]
+
+summary(dfclean)
+
+require(devtools)
+install_github('davidcarslaw/openair')
+library(openair)
+source('~/r_kehra/AirPollutionBN/importAURN.R')
+
+x <- importMeta(source='aurn', all = TRUE)
+y <- importAURN(site = x$code, year = 1981:2014, pollutant = c("pm10","pm2.5","no2","o3","so2","co"), hc = FALSE)
+yy <- y[complete.cases(y),]
+
+stations <- readRDS("~/Documents/stationsKEHRA.rds")
+w <- importAURN(site = stations$SiteID, year = 1981:2014, pollutant = c("pm10","pm2.5","no2","o3","so2","co"), hc = FALSE)
+ww <- w[complete.cases(w),] 
+names(ww) 
+
+clima <- readRDS("~/kehra/data/Climate/clima_England_1981_2014.rds")
+names(ww) <- c("datetime", "pm10", "pm2.5", "no2", "o3", "so2", "co", "site", "SiteID")
+library(dplyr)
+ww <- ww[,c(1:7,9)]
+str(ww)
+ww$datetime <- as.character(ww$datetime)
+ww$SiteID <- as.character(ww$SiteID)
+str(clima)
+
+df1 <- left_join(ww, clima)
+df1 <- df1[complete.cases(df1),]
+
+saveRDS(df1, "~/kehra/data/trainingComplete.rds")
