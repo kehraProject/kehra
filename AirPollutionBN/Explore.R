@@ -69,14 +69,117 @@ summary(x$uniqueYears) # (mean) 6 years
 rm(grouped, x, ind)
 
 ################################################################################
+# GENERATE LAGGED VARIABLES ####################################################
+################################################################################
+
+library(dplyr)
+data <- 
+  df %>%
+  group_by(SiteID) %>%
+  mutate(pm10_l1 = lag(pm10, 24)) %>%
+  mutate(pm10_l2 = lag(pm10, 48)) %>%
+  mutate(pm10_l3 = lag(pm10, 72)) %>%
+  mutate(pm10_l4 = lag(pm10, 96)) %>%
+  mutate(pm10_l5 = lag(pm10, 120)) %>%
+  mutate(pm2.5_l1 = lag(pm2.5, 24)) %>%
+  mutate(pm2.5_l2 = lag(pm2.5, 48)) %>%
+  mutate(pm2.5_l3 = lag(pm2.5, 72)) %>%
+  mutate(pm2.5_l4 = lag(pm2.5, 96)) %>%
+  mutate(pm2.5_l5 = lag(pm2.5, 120)) %>%
+  mutate(no2_l1 = lag(no2, 24)) %>%
+  mutate(no2_l2 = lag(no2, 48)) %>%
+  mutate(no2_l3 = lag(no2, 72)) %>%
+  mutate(no2_l4 = lag(no2, 96)) %>%
+  mutate(no2_l5 = lag(no2, 120)) %>%
+  mutate(o3_l1 = lag(o3, 24)) %>%
+  mutate(o3_l2 = lag(o3, 48)) %>%
+  mutate(o3_l3 = lag(o3, 72)) %>%
+  mutate(o3_l4 = lag(o3, 96)) %>%
+  mutate(o3_l5 = lag(o3, 120)) %>%
+  mutate(so2_l1 = lag(so2, 24)) %>%
+  mutate(so2_l2 = lag(so2, 48)) %>%
+  mutate(so2_l3 = lag(so2, 72)) %>%
+  mutate(so2_l4 = lag(so2, 96)) %>%
+  mutate(so2_l5 = lag(so2, 120)) %>%
+  mutate(co_l1 = lag(co, 24)) %>%
+  mutate(co_l2 = lag(co, 48)) %>%
+  mutate(co_l3 = lag(co, 72)) %>%
+  mutate(co_l4 = lag(co, 96)) %>%
+  mutate(co_l5 = lag(co, 120))
+
+################################################################################
+# GENERATE CUMULATED VARIABLES #################################################
+################################################################################
+
+library(RcppRoll)
+library(dplyr)
+data <- 
+  data %>%
+  group_by(SiteID) %>%
+  mutate(pm10_c1 = roll_sum(pm10, 24, align = "right", fill = NA)) %>%
+  mutate(pm10_c2 = roll_sum(pm10, 48, align = "right", fill = NA)) %>%
+  mutate(pm10_c3 = roll_sum(pm10, 72, align = "right", fill = NA)) %>%
+  mutate(pm10_c4 = roll_sum(pm10, 96, align = "right", fill = NA)) %>%
+  mutate(pm10_c5 = roll_sum(pm10, 120, align = "right", fill = NA)) %>%
+  mutate(pm2.5_c1 = roll_sum(pm2.5, 24, align = "right", fill = NA)) %>%
+  mutate(pm2.5_c2 = roll_sum(pm2.5, 48, align = "right", fill = NA)) %>%
+  mutate(pm2.5_c3 = roll_sum(pm2.5, 72, align = "right", fill = NA)) %>%
+  mutate(pm2.5_c4 = roll_sum(pm2.5, 96, align = "right", fill = NA)) %>%
+  mutate(pm2.5_c5 = roll_sum(pm2.5, 120, align = "right", fill = NA)) %>%
+  mutate(no2_c1 = roll_sum(no2, 24, align = "right", fill = NA)) %>%
+  mutate(no2_c2 = roll_sum(no2, 48, align = "right", fill = NA)) %>%
+  mutate(no2_c3 = roll_sum(no2, 72, align = "right", fill = NA)) %>%
+  mutate(no2_c4 = roll_sum(no2, 96, align = "right", fill = NA)) %>%
+  mutate(no2_c5 = roll_sum(no2, 120, align = "right", fill = NA)) %>%
+  mutate(o3_c1 = roll_sum(o3, 24, align = "right", fill = NA)) %>%
+  mutate(o3_c2 = roll_sum(o3, 48, align = "right", fill = NA)) %>%
+  mutate(o3_c3 = roll_sum(o3, 72, align = "right", fill = NA)) %>%
+  mutate(o3_c4 = roll_sum(o3, 96, align = "right", fill = NA)) %>%
+  mutate(o3_c5 = roll_sum(o3, 120, align = "right", fill = NA)) %>%
+  mutate(so2_c1 = roll_sum(so2, 24, align = "right", fill = NA)) %>%
+  mutate(so2_c2 = roll_sum(so2, 48, align = "right", fill = NA)) %>%
+  mutate(so2_c3 = roll_sum(so2, 72, align = "right", fill = NA)) %>%
+  mutate(so2_c4 = roll_sum(so2, 96, align = "right", fill = NA)) %>%
+  mutate(so2_c5 = roll_sum(so2, 120, align = "right", fill = NA)) %>%
+  mutate(co_c1 = roll_sum(co, 24, align = "right", fill = NA)) %>%
+  mutate(co_c2 = roll_sum(co, 48, align = "right", fill = NA)) %>%
+  mutate(co_c3 = roll_sum(co, 72, align = "right", fill = NA)) %>%
+  mutate(co_c4 = roll_sum(co, 96, align = "right", fill = NA)) %>%
+  mutate(co_c5 = roll_sum(co, 120, align = "right", fill = NA))
+
+################################################################################
+# DRAW CORRELATIONMATRIX FOR OBSERVED AND GENERATED VARIABLES ##################
+################################################################################
+
+names(data)
+
+data <- data[,c("Lat","Lon","Alt","Year","Sea","Mon","Day","Hour",
+                "t2m","ws","wd","tp","blh","ssr",
+                "pm10","pm10_l1","pm10_l2","pm10_l3","pm10_l4","pm10_l5", 
+                "pm10_c1","pm10_c2","pm10_c3","pm10_c4","pm10_c5",
+                "pm2.5", "pm2.5_l1","pm2.5_l2","pm2.5_l3","pm2.5_l4","pm2.5_l5",
+                "pm2.5_c1","pm2.5_c2","pm2.5_c3","pm2.5_c4","pm2.5_c5",
+                "no2","no2_l1","no2_l2","no2_l3","no2_l4","no2_l5", 
+                "no2_c1","no2_c2","no2_c3","no2_c4","no2_c5",
+                "o3", "o3_l1","o3_l2","o3_l3","o3_l4","o3_l5",
+                "o3_c1","o3_c2","o3_c3","o3_c4","o3_c5",
+                "so2", "so2_l1","so2_l2","so2_l3","so2_l4","so2_l5",
+                "so2_c1","so2_c2","so2_c3","so2_c4","so2_c5",
+                "co","co_l1","co_l2","co_l3","co_l4","co_l5", 
+                "co_c1","co_c2","co_c3","co_c4","co_c5")]
+
+library(corrplot)
+corrplot(cor(data, use = "complete.obs"), order = "original")
+
+################################################################################
 # SPLIT THE DATASET INTO TRAINING AND TESTING SETS #############################
 ################################################################################
 
 # Training set contains all the data up to 2007, testing only data for 2008-14
-ind <- which(as.numeric(as.character(df$Year)) <= 2007)
+ind <- which(as.numeric(as.character(data$Year)) <= 2007)
 
-training <- df[ind, ] # ~77% round(dim(training)[1]/dim(df)[1],2)
-testing <- df[-ind, ] # ~23 round(dim(testing)[1]/dim(df)[1],2)
+training <- data[ind, ] # ~77% round(dim(training)[1]/dim(data)[1],2)
+testing <- data[-ind, ] # ~23 round(dim(testing)[1]/dim(data)[1],2)
 
 saveRDS(training, "~/kehra/data/training.rds")
 saveRDS(testing, "~/kehra/data/testing.rds")

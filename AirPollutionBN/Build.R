@@ -157,6 +157,8 @@ stations <- readRDS("~/kehra/data/Pollution/stations.rds")
 library(ncdf4)
 library(raster)
 library(xts)
+library(parallel)
+library(kehra)
 
 # extract data from ERA INTERIM netcdf files
 years <- 1981:2014
@@ -201,7 +203,7 @@ ssr <- do.call(rbind.data.frame, ssrI); rm(ssrI)
 # gc()
 # load("~/kehra/data/Climate/climateTEMP.rda")
 
-# Infill missing value using linear interpolation
+# Infill missing values using linear interpolation
 t2mI <- mclapply(X = unique(t2m$SiteID), 
                  FUN = fillMissingValues, mc.cores = detectCores() - 1,
                  df = t2m, maxgap = 12, parallel = TRUE, formatDT = "%Y-%m-%d %H:%M")
@@ -238,49 +240,24 @@ ws <- u10[, 1:2]; ws$ws <- wsI
 wdI <- mapply(windDirection, u10$u10, v10$v10)
 wd <- u10[, 1:2]; wd$wd <- wdI
 
-# save(t2mI, ws, wd, tpI, blhI, ssrI, file = "~/kehra/data/Climate/climateTEMP2.rda")
+# save(t2m, ws, wd, tp, blh, ssr, file = "~/kehra/data/Climate/climateTEMP2.rda")
 # rm(list=ls(all=TRUE))
 # gc()
 # load("~/kehra/data/Climate/climateTEMP2.rda")
 
 library(dplyr)
 # Fix data types before joining tables to avoid problems with factors
-str(t2mI); str(ws)
-t2mI$datetime <- as.character(t2mI$datetime)
-t2mI$SiteID <- as.character(t2mI$SiteID)
-t2mI$t2m <- as.numeric(as.character(t2mI$t2m))
-ws$datetime <- as.character(ws$datetime)
-ws$SiteID <- as.character(ws$SiteID)
+# str(t2m); str(ws) ...
 # Start joining the columns from the more densely populated (if not filled in)
-clima <- left_join(t2mI, ws, by=c("datetime", "SiteID"))
-
-str(clima); str(wd)
-wd$datetime <- as.character(wd$datetime)
-wd$SiteID <- as.character(wd$SiteID)
+clima <- left_join(t2m, ws, by=c("datetime", "SiteID"))
 clima <- left_join(clima, wd, by=c("datetime", "SiteID"))
+clima <- left_join(clima, tp, by=c("datetime", "SiteID"))
+clima <- left_join(clima, blh, by=c("datetime", "SiteID"))
+clima <- left_join(clima, ssr, by=c("datetime", "SiteID"))
 
-str(clima); str(tpI)
-tpI$datetime <- as.character(tpI$datetime)
-tpI$SiteID <- as.character(tpI$SiteID)
-tpI$tp <- as.numeric(as.character(tpI$tp))
-clima <- left_join(clima, tpI, by=c("datetime", "SiteID"))
-
-str(clima); str(blhI)
-blhI$datetime <- as.character(blhI$datetime)
-blhI$SiteID <- as.character(blhI$SiteID)
-blhI$blh <- as.numeric(as.character(blhI$blh))
-clima <- left_join(clima, blhI, by=c("datetime", "SiteID"))
-
-str(clima); str(ssrI)
-ssrI$datetime <- as.character(ssrI$datetime)
-ssrI$SiteID <- as.character(ssrI$SiteID)
-ssrI$ssr <- as.numeric(as.character(ssrI$ssr))
-clima <- left_join(clima, ssrI, by=c("datetime", "SiteID"))
-
-# saveRDS(clima, "~/kehra/data/Climate/clima_England_1981_2014.rds")
-# clima <- readRDS("~/kehra/data/Climate/clima_England_1981_2014.rds")
-
-# rm(blhI, ssrI, t2mI, tpI, wd, ws)
+# saveRDS(clima, "~/kehra/data/Climate/clima.rds")
+# clima <- readRDS("~/kehra/data/Climate/clima.rds")
+# rm(blh, ssr, t2m, tp, wd, ws, u10, v10, wdI, wsI, years, stations)
 # gc()
 
 # Load pollution data and join with climate data
