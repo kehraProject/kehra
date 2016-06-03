@@ -264,9 +264,10 @@ clima <- left_join(clima, ssr, by=c("datetime", "SiteID"))
 pollution <- readRDS("~/kehra/data/Pollution/pollution.rds")
 str(clima);str(pollution)
 exposure <- full_join(clima, pollution, by=c("datetime", "SiteID"))
+exposure <- left_join(exposure, stations, by = "SiteID")
 saveRDS(exposure, "~/kehra/data/exposure.rds")
 
-# rm(clima, pollution)
+# rm(clima, pollution, stations)
 # gc()
 
 ################################################################################
@@ -405,7 +406,6 @@ HealthSocio <- Health %>%
 # Fix inconsistency with name of regions
 str(HealthSocio)
 HealthSocio$Region[HealthSocio$Region=="London"] <- "Greater London Authority"
-# CHECK: unique(stations$Region) %in% HealthSocio$Region
 
 HealthSocio <- HealthSocio[, c("DateByDay", "Region", "Year", 
                                "CVD00", "CVD20", "CVD40", "CVD60",
@@ -429,18 +429,17 @@ gc()
 # stations <- readRDS("~/kehra/data/Pollution/stations.rds")
 
 # Join exposure and station metadata
-EnglandDB <- exposure %>% left_join(stations, by = "SiteID")
-str(EnglandDB)
-EnglandDB$DateByDay <- as.character(format(as.POSIXlt(EnglandDB$datetime), "%Y-%m-%d"))
-EnglandDB$Year <- as.character(format(as.POSIXlt(EnglandDB$datetime), "%Y"))
-EnglandDB$Month <- as.character(format(as.POSIXlt(EnglandDB$datetime), "%m"))
-EnglandDB$Day <- as.character(format(as.POSIXlt(EnglandDB$datetime), "%d"))
-EnglandDB$Hour <- as.character(format(as.POSIXlt(EnglandDB$datetime), "%H"))
-EnglandDB$Season <- as.character(getSeason(as.Date(EnglandDB$DateByDay)))
-head(EnglandDB)
+str(exposure)
+exposure$DateByDay <- as.character(format(as.POSIXlt(exposure$datetime), "%Y-%m-%d"))
+exposure$Year <- as.character(format(as.POSIXlt(exposure$datetime), "%Y"))
+exposure$Month <- as.character(format(as.POSIXlt(exposure$datetime), "%m"))
+exposure$Day <- as.character(format(as.POSIXlt(exposure$datetime), "%d"))
+exposure$Hour <- as.character(format(as.POSIXlt(exposure$datetime), "%H"))
+exposure$Season <- as.character(getSeason(as.Date(exposure$DateByDay)))
+head(exposure)
 
 # Join exposure and healthsocio
-EnglandDB <- EnglandDB %>% left_join(HealthSocio, 
+EnglandDB <- exposure %>% left_join(HealthSocio, 
                                      by = c("DateByDay", "Region", "Year"))
 
 # For the analysis, variables must be either numeric, factors or ordered factors
@@ -451,7 +450,7 @@ EnglandDB <- EnglandDB[,c("SiteID", "Region", "Zone", "Environment.Type",
                           "Year", "Season", "Month", "Day", "Hour",
                           "Latitude", "Longitude", "Altitude", 
                           "t2m", "ws", "wd", "tp", "blh", "ssr",
-                          "PM10", "PM2.5", "NO2", "O3", "SO2", "CO",
+                          "pm10", "pm2.5", "no2", "o3", "so2", "co",
                           "CVD00", "CVD20", "CVD40", "CVD60",           
                           "LIV00", "LIV20", "LIV40", "LIV60")]
 names(EnglandDB)[4] <- "Type"
