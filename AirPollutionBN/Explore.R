@@ -107,6 +107,8 @@ data <-
   mutate(co_l4 = lag(co, 96)) %>%
   mutate(co_l5 = lag(co, 120))
 
+rm(df)
+
 ################################################################################
 # GENERATE CUMULATED VARIABLES #################################################
 ################################################################################
@@ -147,29 +149,7 @@ data <-
   mutate(co_c4 = roll_sum(co, 96, align = "right", fill = NA)) %>%
   mutate(co_c5 = roll_sum(co, 120, align = "right", fill = NA))
 
-################################################################################
-# DRAW CORRELATIONMATRIX FOR OBSERVED AND GENERATED VARIABLES ##################
-################################################################################
-
-names(data)
-
-data <- data[,c("Lat","Lon","Alt","Year","Sea","Mon","Day","Hour",
-                "t2m","ws","wd","tp","blh","ssr",
-                "pm10","pm10_l1","pm10_l2","pm10_l3","pm10_l4","pm10_l5", 
-                "pm10_c1","pm10_c2","pm10_c3","pm10_c4","pm10_c5",
-                "pm2.5", "pm2.5_l1","pm2.5_l2","pm2.5_l3","pm2.5_l4","pm2.5_l5",
-                "pm2.5_c1","pm2.5_c2","pm2.5_c3","pm2.5_c4","pm2.5_c5",
-                "no2","no2_l1","no2_l2","no2_l3","no2_l4","no2_l5", 
-                "no2_c1","no2_c2","no2_c3","no2_c4","no2_c5",
-                "o3", "o3_l1","o3_l2","o3_l3","o3_l4","o3_l5",
-                "o3_c1","o3_c2","o3_c3","o3_c4","o3_c5",
-                "so2", "so2_l1","so2_l2","so2_l3","so2_l4","so2_l5",
-                "so2_c1","so2_c2","so2_c3","so2_c4","so2_c5",
-                "co","co_l1","co_l2","co_l3","co_l4","co_l5", 
-                "co_c1","co_c2","co_c3","co_c4","co_c5")]
-
-library(corrplot)
-corrplot(cor(data, use = "complete.obs"), order = "original")
+saveRDS(data, "~/kehra/data/dataset.rds")
 
 ################################################################################
 # SPLIT THE DATASET INTO TRAINING AND TESTING SETS #############################
@@ -185,77 +165,11 @@ saveRDS(training, "~/kehra/data/training.rds")
 saveRDS(testing, "~/kehra/data/testing.rds")
 
 ################################################################################
-# CLEAN UP TRAINING SET ########################################################
+# DRAW CORRELATIONMATRIX FOR OBSERVED AND GENERATED VARIABLES ##################
 ################################################################################
 
-df <- readRDS("~/kehra/data/training.rds")
+as.data.frame(names(training))
+str(training)
 
-any(is.na(df$t2m))
-dfclean <- df[-which(is.na(df$t2m)),]; rm(df)
-any(is.na(dfclean$ws))
-any(is.na(dfclean$wd))
-any(is.na(dfclean$tp))
-dfclean <- dfclean[-which(is.na(dfclean$tp)),]
-any(is.na(dfclean$blh))
-any(is.na(dfclean$ssr))
-
-any(is.na(dfclean$CVD00))
-dfclean <- dfclean[-which(is.na(dfclean$CVD00)),]
-any(is.na(dfclean$CVD20))
-any(is.na(dfclean$CVD40))
-any(is.na(dfclean$CVD60))
-
-df <- dfclean[complete.cases(dfclean[, c("PM10","PM2.5","NO2","O3","SO2","CO")]),]
-
-summary(dfclean)
-
-require(devtools)
-install_github('davidcarslaw/openair')
-library(openair)
-source('~/r_kehra/AirPollutionBN/importAURN.R')
-
-x <- importMeta(source='aurn', all = TRUE)
-y <- importAURN(site = x$code, year = 1981:2014, pollutant = c("pm10","pm2.5","no2","o3","so2","co"), hc = FALSE)
-yy <- y[complete.cases(y),]
-
-w <- importAURN(site = stations$SiteID, year = 1981:2014, pollutant = c("pm10","pm2.5","no2","o3","so2","co"), hc = FALSE)
-ww <- w[complete.cases(w),] 
-names(ww) 
-
-clima <- readRDS("~/kehra/data/Climate/clima_England_1981_2014.rds")
-names(ww) <- c("datetime", "pm10", "pm2.5", "no2", "o3", "so2", "co", "site", "SiteID")
-library(dplyr)
-ww <- ww[,c(1:7,9)]
-str(ww)
-ww$datetime <- as.character(ww$datetime)
-ww$SiteID <- as.character(ww$SiteID)
-str(clima)
-
-df1 <- left_join(ww, clima, by = c("datetime", "SiteID"))
-df1 <- left_join(df1, stations, by = "SiteID")
-df1$Year <- format(as.POSIXlt(df1$datetime), "%Y")
-df1$Month <- format(as.POSIXlt(df1$datetime), "%m")
-df1$Day <- format(as.POSIXlt(df1$datetime), "%d")
-df1$Hour <- format(as.POSIXlt(df1$datetime), "%H")
-library(kehra)
-df1$Season <- getSeason(DATES = as.POSIXlt(df1$datetime))
-
-df1 <- df1[,c("SiteID", "Region", "Zone", "Environment.Type", "Latitude", "Longitude", "Altitude",
-              "Year", "Season", "Month", "Day", "Hour",
-              "t2m", "ws", "wd", "tp", "blh", "ssr",
-              "pm10", "pm2.5", "no2", "o3", "so2", "co")]
-str(df1)
-df1$Year <- as.numeric(df1$Year)
-season <- as.factor(df1$Season)
-levels(season) <- c(1,2,3,4) # 1 = "Fall", 2 = "Spring", 3 = "Summer", 4 = "Winter"
-df1$Season <- as.numeric(levels(season))[season]
-df1$Month <- as.numeric(df1$Month)
-df1$Day <- as.numeric(df1$Day)
-df1$Hour <- as.numeric(df1$Hour)
-
-names(df1) <- c("ID", "Reg", "Zone", "Type", "Lat", "Lon", "Alt",
-                "Year", "Sea", "Mon", "Day", "Hour",
-                "t2m", "ws", "wd", "tp", "blh", "ssr",
-                "pm10", "pm2.5", "no2", "o3", "so2", "co")
-
-saveRDS(df1, "~/kehra/data/trainingComplete.rds")
+library(corrplot)
+corrplot(cor(training[,10:92], use = "complete.obs"), order = "original")

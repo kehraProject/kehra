@@ -412,11 +412,9 @@ HealthSocio <- HealthSocio[, c("DateByDay", "Region", "Year",
                                "LIV00", "LIV20", "LIV40", "LIV60")]
 
 # saveRDS(HealthSocio, "~/kehra/data/Health/HealthSocio.rds")
-# rm(Health, populationEstimates)
+# rm(list=ls(all=TRUE))
 
 # Build England database #######################################################
-
-# rm(list=ls(all=TRUE))
 
 # Check available memory
 system("awk '/MemFree/ {print $2}' /proc/meminfo", intern=TRUE)
@@ -426,10 +424,8 @@ gc()
 # Reload all the necessary datasets
 # HealthSocio <- readRDS("~/kehra/data/Health/HealthSocio.rds") 
 # exposure <- readRDS("~/kehra/data/exposure.rds")
-# stations <- readRDS("~/kehra/data/Pollution/stations.rds")
 
 # Join exposure and station metadata
-str(exposure)
 exposure$DateByDay <- as.character(format(as.POSIXlt(exposure$datetime), "%Y-%m-%d"))
 exposure$Year <- as.character(format(as.POSIXlt(exposure$datetime), "%Y"))
 exposure$Month <- as.character(format(as.POSIXlt(exposure$datetime), "%m"))
