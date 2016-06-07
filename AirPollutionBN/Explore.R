@@ -201,6 +201,8 @@ trainingConOrd <- training[, c("Latitude","Longitude","Altitude",
                                "LIV00","LIV20","LIV40","LIV60")]
 
 completeTraining <- trainingConOrd[complete.cases(trainingConOrd),]
+saveRDS(completeTraining, "~/kehra/data/completeTraining.rds")
+
 library(corrplot)
 corrplot(corr = cor(completeTraining), order = "original")
 
