@@ -149,11 +149,13 @@ data <-
   mutate(co_c4 = roll_sum(co, 96, align = "right", fill = NA)) %>%
   mutate(co_c5 = roll_sum(co, 120, align = "right", fill = NA))
 
-saveRDS(data, "~/kehra/data/dataset.rds")
+# saveRDS(data, "~/kehra/data/dataset.rds")
 
 ################################################################################
 # SPLIT THE DATASET INTO TRAINING AND TESTING SETS #############################
 ################################################################################
+
+data <- readRDS("~/kehra/data/dataset.rds")
 
 # Training set contains all the data up to 2007, testing only data for 2008-14
 ind <- which(as.numeric(as.character(data$Year)) <= 2007)
@@ -168,8 +170,82 @@ saveRDS(testing, "~/kehra/data/testing.rds")
 # DRAW CORRELATIONMATRIX FOR OBSERVED AND GENERATED VARIABLES ##################
 ################################################################################
 
+rm(data, testing, ind); gc()
+
 as.data.frame(names(training))
 str(training)
 
+# Re-order continuous features in the training columns
+
+trainingConOrd <- training[, c("Latitude","Longitude","Altitude", 
+                               "t2m","ws","wd","tp","blh","ssr",      
+                               "pm10",
+                               "pm10_l1","pm10_l2","pm10_l3","pm10_l4","pm10_l5", 
+                               "pm10_c1","pm10_c2","pm10_c3","pm10_c4","pm10_c5",
+                               "pm2.5",
+                               "pm2.5_l1","pm2.5_l2","pm2.5_l3","pm2.5_l4","pm2.5_l5",
+                               "pm2.5_c1","pm2.5_c2","pm2.5_c3","pm2.5_c4","pm2.5_c5", 
+                               "no2",
+                               "no2_l1","no2_l2","no2_l3","no2_l4","no2_l5",
+                               "no2_c1","no2_c2","no2_c3","no2_c4","no2_c5",
+                               "o3",
+                               "o3_l1","o3_l2","o3_l3","o3_l4","o3_l5",
+                               "o3_c1","o3_c2","o3_c3","o3_c4","o3_c5",
+                               "so2",
+                               "so2_l1","so2_l2","so2_l3","so2_l4","so2_l5",
+                               "so2_c1","so2_c2","so2_c3","so2_c4","so2_c5",
+                               "co",
+                               "co_l1","co_l2","co_l3","co_l4","co_l5",
+                               "co_c1","co_c2","co_c3","co_c4","co_c5",
+                               "CVD00","CVD20","CVD40","CVD60",
+                               "LIV00","LIV20","LIV40","LIV60")]
+
+completeTraining <- trainingConOrd[complete.cases(trainingConOrd),]
 library(corrplot)
-corrplot(cor(training[,10:92], use = "complete.obs"), order = "original")
+corrplot(corr = cor(completeTraining), order = "original")
+
+## Correlation matrix for large datasets #######################################
+library(ff)
+
+bigcor <- function(x, nblocks = 10, verbose = TRUE, ...){
+  
+  NCOL <- ncol(x)
+  
+  ## test if ncol(x) %% nblocks gives remainder 0
+  if (NCOL %% nblocks != 0) stop("Choose different 'nblocks' so that ncol(x) %% nblocks = 0!")
+  
+  ## preallocate square matrix of dimension
+  ## ncol(x) in 'ff' single format
+  corMAT <- ff(vmode = "single", dim = c(NCOL, NCOL))
+  
+  ## split column numbers into 'nblocks' groups
+  SPLIT <- split(1:NCOL, rep(1:nblocks, each = NCOL/nblocks))
+  
+  ## create all unique combinations of blocks
+  COMBS <- expand.grid(1:length(SPLIT), 1:length(SPLIT))
+  COMBS <- t(apply(COMBS, 1, sort))
+  COMBS <- unique(COMBS)
+  
+  ## iterate through each block combination, calculate correlation matrix
+  ## between blocks and store them in the preallocated matrix on both
+  ## symmetric sides of the diagonal
+  for (i in 1:nrow(COMBS)) {
+    COMB <- COMBS[i, ]
+    G1 <- SPLIT[[COMB[1]]]
+    G2 <- SPLIT[[COMB[2]]]
+    if (verbose) cat("Block", COMB[1], "with Block", COMB[2], "\n")
+    flush.console()
+    COR <- cor(x[, G1], x[, G2], ...)
+    corMAT[G1, G2] <- COR
+    corMAT[G2, G1] <- t(COR)
+    COR <- NULL
+  }
+  
+  gc()
+  return(corMAT)
+}
+
+# CorrelationMatrix <- bigcor(training[,10:92], nblocks = 41)
+# instead of cor(training[,10:92], use = "complete.obs")
+
+

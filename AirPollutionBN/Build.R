@@ -12,7 +12,7 @@ library(parallel)
 library(rdefra)
 
 # INSTALL OPENAIR package
-install_github('davidcarslaw/openair')
+# install_github('davidcarslaw/openair')
 library(openair)
 # load modified script
 source('~/r_kehra/AirPollutionBN/importAURN.R')
@@ -77,7 +77,7 @@ OPENAIRts <- importAURN(site = stations$SiteID, year = 1981:2014,
                         hc = FALSE)
 
 # How many stations actually have datasets?
-stations <- stations[which(stations$SiteID %in% unique(OPENAIRts$SiteID)),]
+stations <- stations[which(stations$SiteID %in% unique(OPENAIRts$code)),]
 # saveRDS(stations, "~/kehra/data/Pollution/stations.rds")
 
 # Clean up OPENAIRts
@@ -85,52 +85,49 @@ OPENAIRts <- OPENAIRts[, c("code", "date", "pm10", "pm2.5", "no2", "o3", "so2", 
 names(OPENAIRts) <- c("SiteID", "datetime", "pm10", "pm2.5", "no2", "o3", "so2", "co")
 OPENAIRts$SiteID <- as.character(OPENAIRts$SiteID)
 OPENAIRts$datetime <- as.character(OPENAIRts$datetime)
-# saveRDS(pollution, "~/kehra/data/Pollution/pollutionTEMP.rds")
-# pollution <- readRDS("~/kehra/data/Pollution/pollutionTEMP.rds")
-
-rm(OPENAIRts, PM10, PM10l, stations, stations2, reg, Regions, stationsSP, x, importAURN)
+# saveRDS(OPENAIRts, "~/kehra/data/Pollution/pollutionTEMP.rds")
 
 # Infill missing values using linear interpolation (maxgap = 12)
 library(parallel)
 library(kehra)
-PM10l <- mclapply(X = unique(pollution$SiteID),
+PM10l <- mclapply(X = unique(OPENAIRts$SiteID),
                   FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                  df = pollution[, c("datetime", "SiteID", "pm10")],
+                  df = OPENAIRts[, c("datetime", "SiteID", "pm10")],
                   parallel = TRUE)
 PM10 <- do.call(rbind.data.frame, PM10l)
 rm(PM10l); head(PM10)
 
-PM25l <- mclapply(as.character(unique(pollution$SiteID)),
+PM25l <- mclapply(as.character(unique(OPENAIRts$SiteID)),
                   FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                  pollution[, c("datetime", "SiteID", "pm2.5")],
+                  OPENAIRts[, c("datetime", "SiteID", "pm2.5")],
                   parallel = TRUE)
 PM2.5 <- do.call(rbind.data.frame, PM25l)
 rm(PM25l)
 
-NO2l <- mclapply(as.character(unique(pollution$SiteID)),
+NO2l <- mclapply(as.character(unique(OPENAIRts$SiteID)),
                  FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                 pollution[, c("datetime", "SiteID", "no2")],
+                 OPENAIRts[, c("datetime", "SiteID", "no2")],
                  parallel = TRUE)
 NO2 <- do.call(rbind.data.frame, NO2l)
 rm(NO2l)
 
-O3l <- mclapply(as.character(unique(pollution$SiteID)),
+O3l <- mclapply(as.character(unique(OPENAIRts$SiteID)),
                 FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                pollution[, c("datetime", "SiteID", "o3")],
+                OPENAIRts[, c("datetime", "SiteID", "o3")],
                 parallel = TRUE)
 O3 <- do.call(rbind.data.frame, O3l)
 rm(O3l)
 
-SO2l <- mclapply(as.character(unique(pollution$SiteID)),
+SO2l <- mclapply(as.character(unique(OPENAIRts$SiteID)),
                  FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                 pollution[, c("datetime", "SiteID", "so2")],
+                 OPENAIRts[, c("datetime", "SiteID", "so2")],
                  parallel = TRUE)
 SO2 <- do.call(rbind.data.frame, SO2l)
 rm(SO2l)
 
-COl <- mclapply(as.character(unique(pollution$SiteID)),
+COl <- mclapply(as.character(unique(OPENAIRts$SiteID)),
                 FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                pollution[, c("datetime", "SiteID", "co")],
+                OPENAIRts[, c("datetime", "SiteID", "co")],
                 parallel = TRUE)
 CO <- do.call(rbind.data.frame, COl)
 rm(COl)
@@ -142,8 +139,6 @@ pollution <- left_join(pollution, O3, by=c("datetime", "SiteID"))
 pollution <- left_join(pollution, SO2, by=c("datetime", "SiteID"))
 pollution <- left_join(pollution, CO, by=c("datetime", "SiteID"))
 
-# stations <- readRDS("~/kehra/data/Pollution/stations.rds")
-pollution <- left_join(pollution, stations, by = "SiteID")
 # saveRDS(pollution, "~/kehra/data/Pollution/pollution.rds")
 
 ################################################################################
@@ -164,37 +159,37 @@ library(kehra)
 years <- 1981:2014
 t2mI <- mclapply(X = years, 
                  FUN = pointInspection, mc.cores = length(years),
-                 points = stations, var = "t2m", prefix = "climate", 
+                 points = stations, var = "t2m", prefix = "climate",  # or "climate"
                  path = "~/kehra/data/Climate", parallel = TRUE)
 t2m <- do.call(rbind.data.frame, t2mI); rm(t2mI)
 
 u10I <- mclapply(X = years, 
                  FUN = pointInspection, mc.cores = length(years),
-                 points = stations, var = "u10", prefix = "climate", 
+                 points = stations, var = "u10", prefix = "climate",  # or "climate"
                  path = "~/kehra/data/Climate", parallel = TRUE)
 u10 <- do.call(rbind.data.frame, u10I); rm(u10I)
 
 v10I <- mclapply(X = years, 
                  FUN = pointInspection, mc.cores = length(years),
-                 points = stations, var = "v10", prefix = "climate", 
+                 points = stations, var = "v10", prefix = "climate",  # or "climate"
                  path = "~/kehra/data/Climate", parallel = TRUE)
 v10 <- do.call(rbind.data.frame, v10I); rm(v10I)
 
 tpI <- mclapply(X = years, 
                 FUN = pointInspection, mc.cores = length(years),
-                points = stations, var = "tp", prefix = "climate", 
+                points = stations, var = "tp", prefix = "climate",  # or "climate"
                 path = "~/kehra/data/Climate", parallel = TRUE)
 tp <- do.call(rbind.data.frame, tpI); rm(tpI)
 
 blhI <- mclapply(X = years, 
                  FUN = pointInspection, mc.cores = length(years),
-                 points = stations, var = "blh", prefix = "climate", 
+                 points = stations, var = "blh", prefix = "climate",  # or "climate"
                  path = "~/kehra/data/Climate", parallel = TRUE)
 blh <- do.call(rbind.data.frame, blhI); rm(blhI)
 
 ssrI <- mclapply(X = years, 
                  FUN = pointInspection, mc.cores = length(years),
-                 points = stations, var = "ssr", prefix = "climate", 
+                 points = stations, var = "ssr", prefix = "PBR", # or "climate"
                  path = "~/kehra/data/Climate", parallel = TRUE)
 ssr <- do.call(rbind.data.frame, ssrI); rm(ssrI)
 
@@ -256,19 +251,6 @@ clima <- left_join(clima, blh, by=c("datetime", "SiteID"))
 clima <- left_join(clima, ssr, by=c("datetime", "SiteID"))
 
 # saveRDS(clima, "~/kehra/data/Climate/clima.rds")
-# clima <- readRDS("~/kehra/data/Climate/clima.rds")
-# rm(blh, ssr, t2m, tp, wd, ws, u10, v10, wdI, wsI, years, stations)
-# gc()
-
-# Load pollution data and join with climate data
-pollution <- readRDS("~/kehra/data/Pollution/pollution.rds")
-str(clima);str(pollution)
-exposure <- full_join(clima, pollution, by=c("datetime", "SiteID"))
-exposure <- left_join(exposure, stations, by = "SiteID")
-saveRDS(exposure, "~/kehra/data/exposure.rds")
-
-# rm(clima, pollution, stations)
-# gc()
 
 ################################################################################
 # ADD HEALTH DATA ##############################################################
@@ -406,6 +388,7 @@ HealthSocio <- Health %>%
 # Fix inconsistency with name of regions
 str(HealthSocio)
 HealthSocio$Region[HealthSocio$Region=="London"] <- "Greater London Authority"
+# CHECK: unique(stations$Region) %in% HealthSocio$Region
 
 HealthSocio <- HealthSocio[, c("DateByDay", "Region", "Year", 
                                "CVD00", "CVD20", "CVD40", "CVD60",
@@ -421,11 +404,18 @@ system("awk '/MemFree/ {print $2}' /proc/meminfo", intern=TRUE)
 # Do garbage collection, if necessary
 gc()
 
-# Reload all the necessary datasets
-# HealthSocio <- readRDS("~/kehra/data/Health/HealthSocio.rds") 
-# exposure <- readRDS("~/kehra/data/exposure.rds")
+# Load pollution data and join with climate data
+clima <- readRDS("~/kehra/data/Climate/clima.rds")
+pollution <- readRDS("~/kehra/data/Pollution/pollution.rds")
+str(clima);str(pollution)
+exposure <- full_join(clima, pollution, by=c("datetime", "SiteID"))
 
-# Join exposure and station metadata
+# saveRDS(exposure, "~/kehra/data/exposure.rds")
+# rm(clima, pollution)
+# gc()
+
+# Expand time variables
+library(kehra)
 exposure$DateByDay <- as.character(format(as.POSIXlt(exposure$datetime), "%Y-%m-%d"))
 exposure$Year <- as.character(format(as.POSIXlt(exposure$datetime), "%Y"))
 exposure$Month <- as.character(format(as.POSIXlt(exposure$datetime), "%m"))
@@ -433,34 +423,39 @@ exposure$Day <- as.character(format(as.POSIXlt(exposure$datetime), "%d"))
 exposure$Hour <- as.character(format(as.POSIXlt(exposure$datetime), "%H"))
 exposure$Season <- as.character(getSeason(as.Date(exposure$DateByDay)))
 head(exposure)
+# saveRDS(exposure, "~/kehra/data/exposure.rds")
+
+# Join with stations to get the region/zone/type of monitoring
+stations <- readRDS("~/kehra/data/Pollution/stations.rds")
+expStation <- exposure %>% left_join(stations, by = "SiteID")
 
 # Join exposure and healthsocio
-EnglandDB <- exposure %>% left_join(HealthSocio, 
-                                     by = c("DateByDay", "Region", "Year"))
+HealthSocio <- readRDS("~/kehra/data/Health/HealthSocio.rds")
+EnglandDB <- expStation %>% left_join(HealthSocio, 
+                                      by = c("DateByDay", "Region", "Year"))
 
 # For the analysis, variables must be either numeric, factors or ordered factors
 # Check variable types (factor/categorical or numeric)
-str(EnglandDB); as.data.frame(names(EnglandDB))
-# reorder the info (categorical first, then continouous)
-EnglandDB <- EnglandDB[,c("SiteID", "Region", "Zone", "Environment.Type", 
-                          "Year", "Season", "Month", "Day", "Hour",
-                          "Latitude", "Longitude", "Altitude", 
-                          "t2m", "ws", "wd", "tp", "blh", "ssr",
-                          "pm10", "pm2.5", "no2", "o3", "so2", "co",
-                          "CVD00", "CVD20", "CVD40", "CVD60",           
-                          "LIV00", "LIV20", "LIV40", "LIV60")]
-names(EnglandDB)[4] <- "Type"
-
-# Fix data types
 str(EnglandDB)
+# Fix data types
 EnglandDB$SiteID <- factor(EnglandDB$SiteID)
 EnglandDB$Region <- factor(EnglandDB$Region)
 EnglandDB$Zone   <- factor(EnglandDB$Zone)
-EnglandDB$Type   <- factor(EnglandDB$Type)
+EnglandDB$Environment.Type   <- factor(EnglandDB$Environment.Type)
 EnglandDB$Year   <- factor(EnglandDB$Year)
 EnglandDB$Season <- factor(EnglandDB$Season)
 EnglandDB$Month  <- factor(EnglandDB$Month)
 EnglandDB$Day    <- factor(EnglandDB$Day)
 EnglandDB$Hour   <- factor(EnglandDB$Hour)
+# reorder the info (categorical first, then continouous)
+as.data.frame(names(EnglandDB))
+db <- EnglandDB[,c("SiteID", "Region", "Zone", "Environment.Type", 
+                   "Year", "Season", "Month", "Day", "Hour",
+                   "Latitude", "Longitude", "Altitude", 
+                   "t2m", "ws", "wd", "tp", "blh", "ssr",
+                   "pm10", "pm2.5", "no2", "o3", "so2", "co",
+                   "CVD00", "CVD20", "CVD40", "CVD60",           
+                   "LIV00", "LIV20", "LIV40", "LIV60")]
+names(db)[4] <- "Type"
 
-# saveRDS(EnglandDB, "~/kehra/data/EnglandDB.rds")
+# saveRDS(db, "~/kehra/data/EnglandDB.rds")
