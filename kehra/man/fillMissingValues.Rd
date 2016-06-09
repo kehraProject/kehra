@@ -5,7 +5,7 @@
 \title{Fill missing values}
 \usage{
 fillMissingValues(ids, df, maxgap = 12, parallel = FALSE,
-  formatDT = "\%d-\%m-\%Y \%H:\%M")
+  formatDT = "\%Y-\%m-\%d \%H:\%M")
 }
 \arguments{
 \item{ids}{site identification codes}
