@@ -5,8 +5,8 @@ Version: 0.1
 Date: 2016-05-17
 Author: Claudia Vitolo [aut, cre], Allan Tucker [aut], Andrew Russell [aut]
 Maintainer: Claudia Vitolo <cvitolodev@gmail.com>
-URL: http://cvitolo.github.io/kehra/
-BugReports: https://github.com/cvitolo/kehra/issues
+URL: https://github.com/kehraProject/r_kehra
+BugReports: https://github.com/kehraProject/r_kehra/issues
 Description: Collection of utility functions used in the KEHRA project. It refers to the multidimensional analysis of air pollution, weather and health data.
 Depends: R (>= 2.14.0)
 Imports: Hmisc, raster, reshape2, stringr, sp, xts, zoo
