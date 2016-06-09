@@ -21,3 +21,5 @@ vignettes/*.pdf
 
 # CV
 r_kehra.Rproj
+data/*
+images/*
