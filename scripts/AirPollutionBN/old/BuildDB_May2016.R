@@ -8,7 +8,6 @@ library(devtools)
 # INSTALL KEHRA package
 # install_github("cvitolo/r_kehra", subdir = "kehra")
 library(kehra)
-library(parallel)
 
 # rm(new.packages, packs)
 
@@ -125,9 +124,9 @@ PM2.5 <- do.call(rbind.data.frame, PM25l)
 rm(PM25l)
 
 NO2l <- mclapply(as.character(unique(pollutionDB$SiteID)),
-                  FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                  pollutionDB[, c("datetime", "SiteID", "NO2")],
-                  parallel = TRUE)
+                 FUN = fillMissingValues, mc.cores = detectCores() - 1,
+                 pollutionDB[, c("datetime", "SiteID", "NO2")],
+                 parallel = TRUE)
 NO2 <- do.call(rbind.data.frame, NO2l)
 rm(NO2l)
 
@@ -173,49 +172,33 @@ library(raster)
 library(xts)
 
 # extract data from ERA INTERIM netcdf files
-years <- 1981:2014
-t2mI <- mclapply(X = years, 
-                 FUN = pointInspection, mc.cores = length(years),
-                 points = stations, var = "t2m", prefix = "climate", 
-                 path = "~/kehra/data/Climate", parallel = TRUE)
-t2m <- do.call(rbind.data.frame, t2mI); rm(t2mI)
-
-u10I <- mclapply(X = years, 
-                 FUN = pointInspection, mc.cores = length(years),
-                 points = stations, var = "u10", prefix = "climate", 
-                 path = "~/kehra/data/Climate", parallel = TRUE)
-u10 <- do.call(rbind.data.frame, u10I); rm(u10I)
-
-v10I <- mclapply(X = years, 
-                 FUN = pointInspection, mc.cores = length(years),
-                 points = stations, var = "v10", prefix = "climate", 
-                 path = "~/kehra/data/Climate", parallel = TRUE)
-v10 <- do.call(rbind.data.frame, v10I); rm(v10I)
-
-tpI <- mclapply(X = years, 
-                 FUN = pointInspection, mc.cores = length(years),
-                 points = stations, var = "tp", prefix = "climate", 
-                 path = "~/kehra/data/Climate", parallel = TRUE)
-tp <- do.call(rbind.data.frame, tpI); rm(tpI)
-
-blhI <- mclapply(X = years, 
-                 FUN = pointInspection, mc.cores = length(years),
-                 points = stations, var = "blh", prefix = "climate", 
-                 path = "~/kehra/data/Climate", parallel = TRUE)
-blh <- do.call(rbind.data.frame, blhI); rm(blhI)
-
-ssrI <- mclapply(X = years, 
-                 FUN = pointInspection, mc.cores = length(years),
-                 points = stations, var = "ssr", prefix = "climate", 
-                 path = "~/kehra/data/Climate", parallel = TRUE)
-ssr <- do.call(rbind.data.frame, ssrI); rm(ssrI)
+t2m <- GetDataFromECMWF(stations, years = 1981:2014, 
+                        var = "t2m", timestep = 3, 
+                        prefix = "climate", path = "~/kehra/data/Climate")
+u10 <- GetDataFromECMWF(stations, years = 1981:2014, 
+                        var = "u10", timestep = 3, 
+                        prefix = "climate", path = "~/kehra/data/Climate")
+v10 <- GetDataFromECMWF(stations, years = 1981:2014, 
+                        var = "v10", timestep = 3, 
+                        prefix = "climate", path = "~/kehra/data/Climate")
+tp <- GetDataFromECMWF(stations, years = 1981:2014, 
+                       var = "tp", timestep = 3, 
+                       prefix = "climate", path = "~/kehra/data/Climate")
+blh <- GetDataFromECMWF(stations, years = 1981:2014, 
+                        var = "blh", timestep = 3, 
+                        prefix = "climate", path = "~/kehra/data/Climate")
+ssr <- GetDataFromECMWF(stations, years = 1981:2014, 
+                        var = "ssr", timestep = 3, 
+                        prefix = "climate", path = "~/kehra/data/Climate")
 
 # save(t2m, u10, v10, tp,blh,ssr, file = "~/kehra/data/Climate/climateTEMP.rda")
-# rm(blh, ssr, )
+# rm(list=ls(all=TRUE))
 # gc()
 # load("~/kehra/data/Climate/climateTEMP.rda")
 
 # Infill missing value using linear interpolation
+library(parallel)
+library(kehra)
 t2mI <- mclapply(X = unique(t2m$SiteID), 
                  FUN = fillMissingValues, mc.cores = detectCores() - 1,
                  df = t2m, maxgap = 12, parallel = TRUE, formatDT = "%Y-%m-%d %H:%M")
@@ -232,8 +215,8 @@ v10I <- mclapply(X = unique(v10$SiteID),
 v10 <- do.call(rbind.data.frame, v10I); rm(v10I)
 
 tpI <- mclapply(X = unique(tp$SiteID), 
-                 FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                 df = tp, maxgap = 12, parallel = TRUE, formatDT = "%Y-%m-%d %H:%M")
+                FUN = fillMissingValues, mc.cores = detectCores() - 1,
+                df = tp, maxgap = 12, parallel = TRUE, formatDT = "%Y-%m-%d %H:%M")
 tp <- do.call(rbind.data.frame, tpI); rm(tpI)
 
 blhI <- mclapply(X = unique(blh$SiteID), 
@@ -310,7 +293,7 @@ saveRDS(exposure, "~/kehra/data/exposure.rds")
 # ADD HEALTH DATA ##############################################################
 ################################################################################
 
-rm(list=ls(all=TRUE))
+# rm(list=ls(all=TRUE))
 
 # Health data in the UK is available from the Office for National Statistics 
 # (for all the experiments run with the data, see the script 
@@ -441,6 +424,7 @@ HealthSocio <- Health %>%
 
 # Fix inconsistency with name of regions
 str(HealthSocio)
+
 HealthSocio$Region[HealthSocio$Region=="London"] <- "Greater London Authority"
 # CHECK: unique(stations$Region) %in% HealthSocio$Region
 

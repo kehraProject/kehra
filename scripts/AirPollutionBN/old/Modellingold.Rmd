@@ -1,0 +1,347 @@
+---
+title: "Modelling"
+author: "Claudia Vitolo"
+date: "4th January 2016"
+output: html_document
+---
+
+Locate stations in England, active between 1998 and 2013
+```{r}
+# library(ggmap)
+# p <- get_map("England", zoom = 6)
+# ggmap(p) + geom_point(data=siteDetails, aes(x=longitude, y=latitude), color="red", size=3, alpha=0.5) + 
+#   geom_point(data=x, aes(x=Longitude, y=Latitude), color="blue", size=3, alpha=0.5)
+stations <- readRDS("data/Pollution/openairStations.rds")
+library(leaflet)
+leaflet(data = stations) %>% addTiles() %>% addCircleMarkers(radius = 5, popup = ~Name)
+```
+
+# Statistical analysis at 1 location: London Harlington (UKA00472)
+Data is available from ("http://uk-air.defra.gov.uk/data/flat_files?site_id=HRL"), from 2004 to 2015. 
+
+```{r}
+rm(list = ls())
+closeAllConnections()
+
+require(INLA)
+require(maptools)
+require(lattice)
+library(manipulate)
+
+# install.packages("openair")
+library(openair)
+HRL <- importAURN(site = "HRL", year = 2004:2015) # Harlington
+MY1 <- importAURN(site = "MY1", year = 2004:2015) # Marylebone Road
+mySites <- c(HRL, MY1)
+
+# DEFRA Daily Air Quality Index (DAQI)
+## the labels - same for all species 
+labels <- c("1 - Low", "2 - Low", "3 - Low", "4 - Moderate", "5 - Moderate", 
+            "6 - Moderate", "7 - High", "8 - High", "9 - High", "10 - Very High")
+o3.breaks <-c(0, 34, 66, 100, 121, 141, 160, 188, 214, 240, 500) 
+no2.breaks <- c(0, 67, 134, 200, 268, 335, 400, 468, 535, 600, 1000) 
+pm10.breaks <- c(0, 17, 34, 50, 59, 67, 75, 84, 92, 100, 1000) 
+pm25.breaks <- c(0, 12, 24, 35, 42, 47, 53, 59, 65, 70, 1000)
+
+manipulate(calendarPlot(eval(parse(text=site)), year = x, 
+                        pollutant = "pm10", annotate = "value", 
+                        labels = labels, breaks = pm10.breaks,
+                        lim = pm10.breaks[4], col.lim = c("black", "orange"),
+                        statistic = "mean", cols = "jet"),
+           x = slider(2004, 2015),
+           site = picker("HRL", "MY1"))
+
+## no2 index example 
+manipulate(calendarPlot(eval(parse(text=site)), year = x, 
+                        pollutant = "no2", annotate = "value", 
+                        labels = labels, breaks = no2.breaks,
+                        lim = no2.breaks[4], col.lim = c("black", "orange"),
+                        statistic = "max", cols = "jet"),
+           x = slider(2004, 2015),
+           site = picker("HRL", "MY1"))
+## for PM10 or PM2.5 we need the daily mean concentration 
+manipulate(calendarPlot(eval(parse(text=site)), year = x, 
+                        pollutant = "pm10", annotate = "value", 
+                        labels = labels, breaks = pm10.breaks,
+                        lim = pm10.breaks[4], col.lim = c("black", "orange"),
+                        statistic = "mean", cols = "jet"),
+           x = slider(2004, 2015),
+           site = picker("HRL", "MY1"))
+manipulate(calendarPlot(eval(parse(text=site)), year = x, 
+                        pollutant = "pm25", annotate = "value", 
+                        labels = labels, breaks = pm25.breaks,
+                        lim = pm25.breaks[4], col.lim = c("black", "orange"),
+                        statistic = "mean", cols = "jet"),
+           x = slider(2004, 2015),
+           site = picker("HRL", "MY1"))
+## for ozone, need the rolling 8-hour mean 
+manipulate(calendarPlot(rollingMean(eval(parse(text=site)), 
+                                    pollutant = "o3", hours = 8),
+                        year = x, 
+                        pollutant = "rolling8o3", annotate = "value", 
+                        labels = labels, breaks = o3.breaks,
+                        lim = o3.breaks[4], col.lim = c("black", "orange"),
+                        statistic = "max", cols = "jet"),
+           x = slider(2004, 2015),
+           site = picker("HRL", "MY1"))
+```
+
+Let's try a summary plot for MY1
+
+```{r}
+summaryPlot(MY1[,c("date", "co", "pm10", "no", "no2", "nox", "o3", "site", "code", "pm2.5", "ws", "wd")])
+```
+
+Let's try a summary plot for HRL
+
+```{r}
+summaryPlot(HRL[,c("date", "co", "pm10", "no", "no2", "nox", "o3", "site", "code", "pm2.5", "ws", "wd")])
+```
+
+Correlation matrix + dendogram at HRL
+```{r}
+corPlot(HRL[,c("date", "co", "pm10", "no", "no2", "nox", "o3", "site", "code", "pm2.5", "ws", "wd")], dendrogram = TRUE)
+```
+
+Correlation matrix + dendogram for all AURN stations in 2014
+```{r}
+df <- readRDS("data/Pollution/allPollutantsClima.rds")
+corPlot(df, dendrogram = TRUE)
+```
+
+Explore table
+```{r}
+names(df)
+# "Date", "id", "Longitude", "Latitude", "Site", "Region", "Z",
+# "PM10", "PM2p5", "CO", "O3", "NO2", "SO2", "TEMP", "WS", "WD", "HMIX", "PREC"
+head(df)
+
+df1 <- na.omit(df[,c("Longitude", "Latitude", "Z",
+                     "PM10", "PM2p5", "CO", "O3", "NO2", "SO2", 
+                     "TEMP", "WS", "WD", "HMIX", "PREC")])
+
+# There are some NAs in columns 9:13, remove rows with all NAs
+temp <- df[,c("PM10", "PM2p5", "CO", "O3", "NO2", "SO2")]
+df2 <- df[rowSums(is.na(temp)) != ncol(temp),]
+# Keep only complete cases (rows with no NAs)
+df3 <- df[complete.cases(temp),]
+
+df0 <- df[complete.cases(df[,c("PM10", "TEMP", "PREC")]), 
+          c("PM10", "TEMP", "WS", "WD", "HMIX", "PREC")]
+```
+
+# BAYESIAN NETWORKS
+Install dependencies from the Bioconductor and CRAN repos
+```{r}
+# Bioconductor
+# source("https://bioconductor.org/biocLite.R")
+# biocLite("graph")
+# biocLite("RBGL")
+# biocLite("Rgraphviz")
+
+# CRAN
+# install.packages(c("Matrix", "igraph", "Rcpp"))
+# install.packages("gRbase")
+# install.packages("gRain")
+# install.packages("bnlearn")
+library(bnlearn)
+```
+
+Load the full dataset for the UK.
+
+```{r}
+df <- readRDS("data/UKdataset.rds")
+str(df)
+# Variables must be either numeric, factors or ordered factors
+df$date <- factor(df$date)
+df$code <- factor(df$code)
+df$Region <- factor(df$Region)
+df$EnvType <- factor(df$EnvType)
+df$Zone <- factor(df$Zone)
+# saveRDS(df, "UKdataset.rds")
+df0 <- df[complete.cases(df),]
+# saveRDS(df0, "UKdataset2Learn.rds")
+```
+
+Using bnlearn, test one-to-one dependecy with Pearson's correlation test (X2):
+```{r}
+ci.test("pm10", "TEMP", test="cor", data=df0)
+ci.test("pm10", "PREC", test="cor", data=df0)
+ci.test("pm10", "WS", test="cor", data=df0)
+ci.test("pm10", "WD", test="cor", data=df0)
+ci.test("pm10", "BLH", test="cor", data=df0)
+```
+
+Let's test the one-to-two hypothesis with Pearson's correlation test (X2):
+```{r}
+ci.test("pm10", "TEMP", "PREC", test="cor", data=df0)
+```
+
+# 
+Use NO expert knowledge to define a Direct Acyclic Graph (DAG) using bnlearn.
+Note that bnlearn's algorithms only work with complete cases!
+```{r}
+bn.mmhc <- mmhc(df0)
+graphviz.plot(bn.mmhc)
+# Network score (Bayesian Information Criterion)
+score(x = bn.mmhc, data = df1, type = "bic-g")
+```
+
+Topography cannot be influenced by climate/pollution factors, therefore we generate a black list (topography only) and update the BIC score:
+```{r}
+bl1 <- data.frame(from=c(rep(c("PM10","PM2p5","CO","O3","NO2","SO2","TEMP","WS",
+                             "WD","HMIX","PREC"),times=3),
+                         c("Latitude", "Longitude"),
+                         c("Latitude", "Z"),
+                         c("Z", "Longitude")),
+                  to=c(rep(c("Latitude", "Longitude", "Z"),each=11),
+                       rep(c("Z", "Longitude", "Latitude"), each=2)))
+bn.mmhc <- mmhc(df1, blacklist = bl1)
+graphviz.plot(bn.mmhc)
+score(x = bn.mmhc, data = df1, type = "bic-g")
+```
+
+Bayesian Networks do not allow for cyclic dependencies, therefore we assume that Climate affects Pollution and non viceversa. Therefore we generate black/white lists and update the BIC score:
+```{r}
+# black list
+bl1 <- data.frame(from=c(rep("Latitude",2), rep("Longitude",2), rep("Z", 2),
+                         rep(c("TEMP", "PREC", "WS", "WD", "HMIX",
+                               "PM10", "PM2p5","CO", "O3", "NO2", "SO2"),3),
+                         "WD", "WS", "PREC", "PM10", "PM10", "PM2p5", "PM2p5"),
+                 to=c(c("Longitude", "Z"), c("Latitude", "Z"),
+                      c("Longitude", "Latitude"),
+                      rep("Latitude",11), rep("Longitude",11), rep("Z",11),
+                      "WS", "WD", "WD","WS", "PM2p5", "PM10", "WD"))
+# white list
+wl1 <- data.frame(from=c("Z", "WS", "WS", "WD"),
+                  to=c("TEMP", "PREC", "HMIX", "PM10"))
+
+bn.mmhc <- mmhc(df1, whitelist = wl1, blacklist = bl1)
+graphviz.plot(bn.mmhc)
+score(x = bn.mmhc, data = df1, type = "bic-g")
+```
+
+## Study the conditional indenpendency
+```{r}
+# dseparation
+nano <- nodes(bn.mmhc)
+indNodes <- c()
+for (n1 in nano){
+  for (n2 in nano){
+    if (dsep(bn.mmhc, n1, n2)){
+      temp <- paste(n1, "and", n2, "are independent")
+      indNodes <- c(indNodes, temp)
+    }
+  }
+}
+# What happens is I fix Temp?
+nano <- nodes(bn.mmhc)
+indNodes2 <- c()
+fixedVar <- "WD" # "PREC" # "TEMP"
+for (n1 in nano[nano != fixedVar]){
+  for (n2 in nano[nano != fixedVar]){
+    if (dsep(bn.mmhc, n1, n2)){
+      temp <- paste(n1, "and", n2, "are independent")
+      indNodes2 <- c(indNodes2, temp)
+    }
+  }
+}
+
+setdiff(indNodes, indNodes2)
+setdiff(indNodes2, indNodes)
+```
+
+### TRAINING
+Find local distributions and their parameters.
+```{r}
+fittedbn <- bn.fit(bn.mmhc, data = df1)
+print(fittedbn)
+print(fittedbn$PM10)
+```
+
+Note difference between fitted parameters for complete cases and those calculated using all observations!
+
+```{r}
+fittedbn$PM10
+lm(PM10 ~ SO2 + WD, data=df1)                        # using GBN1
+confint(lm(PM10 ~ SO2 + WD, data=df1))
+
+lm(PM10 ~ SO2 + WD, data=df)                         # lm can handle NAs!  
+confint(lm(PM10 ~ SO2 + WD, data=df))
+
+lm(PM10 ~ CO + WD, data=df1)                         # using GBN3
+lm(PM10 ~ CO + WD, data=df)  # lm can handle NAs!   
+
+quantile(df1$PM10) # using observed CO and WD
+quantile(predict(lm(PM10 ~ SO2 + WD, data=df1)))     # using observed SO2 and WD
+```
+
+## RBMN package
+The package rbmn is used to compute exact or approximated inference.
+
+```{r}
+library(rbmn)
+# transform the fitted GBN (learned from the DAG above) to the rbmn specific format
+gbn.rbmn <- bnfit2nbn(fittedbn)
+
+# the joint distribution of all nodes (global distribution) is multivariate normal, and parameters can be derived numerically as follows
+gema.rbmn <- nbn2gema(gbn.rbmn)
+mn.rbmn <- gema2mn(gema.rbmn)
+print8mn(mn.rbmn)
+```
+
+The first column is the vector of marginal expectations, the second is the marginal standard deviation and the remaining is the correlation matrix.
+
+What values of PM1O should I expect if CO raises above 2?
+```{r}
+fittedbn$PM10
+fittedbn$SO2
+
+# observed PM10 and CO
+quantile(df1$PM10) # quantile(df$PM10, na.rm = TRUE)
+quantile(df1$SO2)
+quantile(df1$WD)
+
+# how is the model doing trying to predict PM10 knowing the appropriate range for SO2?
+newPM10 <- cpdist(fittedbn, nodes = "PM10", evidence = (SO2 < 81))
+quantile(newPM10[,1])
+
+# how is the model doing trying to predict PM10 knowing the appropriate range for WD?
+newPM10 <- cpdist(fittedbn, nodes = "PM10", evidence = (WD < 360))
+quantile(newPM10[,1])
+
+# We always overestimate the median and greatly underestimate peaks.
+
+# What is the probability of PM10 > 50, if SO2 < 3?
+cpquery(fittedbn, event = (PM10 > 50), evidence = (SO2 < 3))
+cpquery(fittedbn, event = (PM10 > 50), evidence = (SO2 > 3))
+```
+
+# Try bootstrap learning
+```{r}
+df <- readRDS("data/UKdataset.rds")
+names(df)
+df <- df[,c("date", "code", "Region", "Latitude", "Longitude", "Y", "EnvType",
+            "co", "pm10", "pm2.5", "no2", "so2", "o3", "ws", "wd", 
+            "TEMP", "BLH", "PREC",
+            "MortalityRate", "Population")]
+df <- df[complete.cases(df),]
+saveRDS(df, "data/UKdataset2Learn.rds")
+
+library(bnlearn)
+df <- readRDS("data/UKdataset2Learn.rds")
+start <- random.graph(nodes = names(df), num = 50)
+
+library(parallel)
+# Calculate the number of cores
+no_cores <- detectCores() - 10
+# Initiate cluster
+cl <- makeCluster(no_cores)
+netlist <- parLapply(cl, start, function(net) {bnlearn::hc(df, iss = 10, start = net)})
+stopCluster(cl)
+
+arcs = custom.strength(netlist, nodes = names(df), cpdag = FALSE)
+plot(arcs)
+
+}
+# See RINLA.R for Spatio-Temporal Bayesian Models

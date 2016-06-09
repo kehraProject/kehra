@@ -1,0 +1,315 @@
+---
+title: "Build KEHRA DB"
+author: "Claudia Vitolo"
+date: "04/02/2016"
+output: html_document
+---
+
+This is an R Markdown file to document how to build the database used for modelling in the KEHRA project.
+
+The instructions below depend on a number of R packages which are available from CRAN:
+```{r, eval=TRUE, include=TRUE, message=FALSE, comment=FALSE}
+# Check for missing dependencies and install+load them
+packs <- c("devtools", "ggplot2", "leaflet", "dygraphs", "leaflet", "openair", 
+           "plyr", "dplyr")
+new.packages <- packs[!(packs %in% installed.packages()[,"Package"])]
+if(length(new.packages)) install.packages(new.packages)
+lapply(packs, require, character.only = TRUE)
+```
+
+The study is limited to England, between 1981 and 2014. We collected data related to:
+
+- Health outcomes: mortality (from ONS) and/or morbidity (from HSCIC)
+- Socio-economic indicators: population estimates (from ONS MYEDE dataset)
+- Exposure:
+    - Climate (from ECMWF)
+    - Pollution (from DEFRA/AURN monitoring network)
+    
+# POLLUTION DATA
+Pollution data in the UK is available from the DEFRA UK-AIR website (for all the experiments run with the data, see the script __~/kehra/scripts/GetData/DEFRA.R__)
+
+```{r, eval=TRUE, include=FALSE}
+stationsEngland <- readRDS("~/kehra/data/Pollution/stations_England_1979_2014.rds")
+```
+
+There are `r dim(stationsEngland)[1]` UK-AIR (Air Information Resource) stations within England, see map below.
+
+```{r}
+library(leaflet)
+leaflet() %>% addTiles() %>% 
+  addCircleMarkers(data = as.data.frame(stationsEngland), lng = ~longitude, lat = ~latitude, radius = 0.5, popup=~site, col="red")
+```
+
+Extract time series for the above stations.
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+library(dplyr)
+source('~/kehra/scripts/GetData/importAURN.R')
+temp <- importAURN(site = stationsEngland$code, year = 1981:2014)
+
+pollution <- temp %>% left_join(as.data.frame(stationsEngland))
+pollution$DateByDay <- as.Date(pollution$date)
+
+pollution <- pollution[,c("date", "DateByDay", "code", 
+                          "site", "site.type", "Region",
+                          "zone_name", "zone_id", "la_region", "la_region_id",
+                          "date_started", "date_ended", "ratified_to",
+                          "latitude", "longitude", "altitude", "ws", "wd", 
+                          "o3", "so2", "co", "pm10", "pm2.5",
+                          "nv2.5", "v2.5", "nv10", "v10", "no", "no2", "nox")]
+
+# saveRDS(pollution, "~/kehra/data/Pollution/pollution_England_1979_2014.rds")
+rm(importAURN, temp, stationsEngland)
+```
+
+# CLIMATE DATA
+Climate data is available from ECMWF's ERA-INTERIM website (for all the experiments run with the data, see the script __~/kehra/scripts/GetData/ECMWF.R__)
+
+```{r}
+library(ncdf4)
+library(RNetCDF)
+library(raster)
+
+# Functions to calculate wind speed and direction
+windSpeed <- function(u, v) {
+  sqrt( u^2 + v^2) 
+}
+windDir <- function(u, v) {
+  if (is.na(v) | is.na(u)) {
+    wd <- NA
+  }else{
+    if(v > 0)         wd <- ((180 / pi) * atan(u/v) + 180)
+    if(u < 0 & v < 0) wd <- ((180 / pi) * atan(u/v) + 0)
+    if(u > 0 & v < 0) wd <- ((180 / pi) * atan(u/v) + 360)
+  }
+  return(wd)
+}
+
+# Loop through station IDs
+stationsEngland <- readRDS("~/kehra/data/Pollution/stations_England_1979_2014.rds")
+stationsEngland <- as.data.frame(stationsEngland)
+ids <- stationsEngland$code # 159 stations
+
+# Initialise data frame
+DateByDay <- seq.Date(from = as.Date("1979-01-01"), 
+                      to = as.Date("2014-12-31"), by = "day")
+
+# add placeholders to store climate information
+climate <- data.frame("code" = rep(ids, each = length(DateByDay)), 
+                      "DateByDay" = rep(DateByDay, times = length(ids)),
+                      "TEMP"=NA, "WS"=NA, "WD"=NA, "BLH"=NA, "PREC"=NA)
+climate$Year <- format(as.Date(climate$DateByDay), "%Y")
+
+# Loop through years and station IDs
+for (myYear in 1979:2014){
+  
+  myFile <- paste("~/kehra/data/Climate/climate", myYear, ".nc", sep="")
+  
+  # Temperature
+  t2m <- rotate(brick(x = myFile, varname="t2m"))
+  # Total precipitation
+  tp <- rotate(brick(x = myFile, varname="tp"))
+  # Boundary layers heights
+  blh <- rotate(brick(x = myFile, varname="blh"))
+  # Wind U component
+  u10 <- rotate(brick(x = myFile, varname="u10"))
+  # Wind V component
+  v10 <- rotate(brick(x = myFile, varname="v10"))
+  
+  counter <- 1
+  ### ADD CLIMATE VARIABLES TO POLLUTION DATA ##################################
+  for (id in ids){
+    
+    print(paste(myYear,id))
+    
+    myrows <- which(climate$code == id & climate$Year == myYear)
+    
+    if (length(myrows) > 0){
+      
+      # In df[myrows,] the coordinates are the same, I can just keep the first.
+      points <- SpatialPoints(stationsEngland[counter, 
+                                              c('longitude', 'latitude')], 
+                              proj4string=CRS('+proj=longlat +datum=WGS84'))
+      # Check whether crs(points) == crs(u10) == crs(v10) == crs(t2m)
+      # plot(points, add=TRUE, col="red")
+      
+      climate$TEMP[myrows] <- as.vector(extract(t2m, points))
+      climate$PREC[myrows] <- as.vector(extract(tp, points))
+      climate$BLH[myrows]  <- as.vector(extract(blh, points))
+      u <- as.vector(extract(u10, points))
+      v <- as.vector(extract(v10, points))
+      climate$WS[myrows] <- windSpeed(u,v)
+      wd <- c()
+      for (i in 1:length(myrows)) {
+        wd[i] <- windDir(u[i], v[i])
+      }
+      climate$WD[myrows] <- wd
+    } 
+    
+    counter <- counter + 1
+    
+  }
+  
+  rm(t2m, tp, blh, u10, v10)
+  
+}
+
+# saveRDS(climate, "~/kehra/data/Climate/climate_England_1979_2014.rds")
+rm(list = ls())
+```
+
+Now just join the tables containing pollution and climate to generate the exposure dataset.
+
+```{r}
+library(dplyr)
+pollution <- readRDS("~/kehra/data/Pollution/pollution_England_1979_2014.rds")
+climate <- readRDS("~/kehra/data/Climate/climate_England_1979_2014.rds")
+
+exposure <- pollution %>% left_join(climate)
+
+exposure <- exposure[, c("date", "DateByDay", "Year",
+                         "code", "site", "site.type", "Region",
+                         "zone_name", "zone_id", "la_region", "la_region_id",
+                         "date_started", "date_ended", "ratified_to",
+                         "latitude", "longitude", "altitude", "ws", "wd", 
+                         "o3", "so2", "co", "pm10", "pm2.5", "nv2.5", "v2.5",
+                         "nv10", "v10", "no", "no2", "nox",
+                         "TEMP", "WS", "WD", "BLH", "PREC")]   
+
+# saveRDS(exposure, "~/kehra/data/exposure_England_1979_2014.rds")
+rm(climate, pollution)
+```
+
+# HEALTH DATA
+Health data in the UK is available from the Office for National Statistics (for all the experiments run with the data, see the script __~/kehra/scripts/GetData/HealthData.R__)
+```{r}
+library(gdata)
+
+Deaths <- read.xls("~/kehra/data/Health/ONS_purchasedData/20012005.xls", 
+                   sheet = "Table 1", header = TRUE, skip=2)
+# Look for ambigous dates
+rows <- sort(union(which(Deaths$Month == 0), which(Deaths$Day == 0)))
+Deaths <- Deaths[-rows,]
+# Remove them, for the time being
+CVDcancer <- Deaths[Deaths$Cause == "CVD and cancer",]
+LiverDiseases <- Deaths[Deaths$Cause == "Liver diseases",]
+
+Deaths <- read.xls("~/kehra/data/Health/ONS_purchasedData/20062010.xls", 
+                   sheet = "Table 2", header = TRUE, skip=2)
+# Look for ambigous dates
+rows <- sort(union(which(Deaths$Month == 0), which(Deaths$Day == 0)))
+Deaths <- Deaths[-rows,]
+CVDcancer <- rbind(CVDcancer, Deaths[Deaths$Cause == "CVD and cancer",])
+LiverDiseases <- rbind(LiverDiseases, Deaths[Deaths$Cause == "Liver diseases",])
+
+Deaths <- read.xls("~/kehra/data/Health/ONS_purchasedData/20112014.xls", 
+                   sheet = "Table 3", header = TRUE, skip=2)
+# Look for ambigous dates
+rows <- sort(union(which(Deaths$Month == 0), which(Deaths$Day == 0)))
+Deaths <- Deaths[-rows,]
+CVDcancer <- rbind(CVDcancer, Deaths[Deaths$Cause == "CVD and cancer",])
+LiverDiseases <- rbind(LiverDiseases, Deaths[Deaths$Cause == "Liver diseases",])
+
+rm(Deaths, rows)
+CVDcancer$DateByDay <- as.Date(paste(CVDcancer$Year., CVDcancer$Month, CVDcancer$Day, sep="-"))
+LiverDiseases$DateByDay <- as.Date(paste(LiverDiseases$Year., LiverDiseases$Month, LiverDiseases$Day, sep="-"))
+CVDcancer$Over0 <- apply(X = na.omit(CVDcancer[, 7:26]), MARGIN = 1, FUN = sum)
+CVDcancer$Over20 <- apply(X = na.omit(CVDcancer[, 12:26]), MARGIN = 1, FUN = sum)
+CVDcancer$Over40 <- apply(X = na.omit(CVDcancer[, 16:26]), MARGIN = 1, FUN = sum)
+CVDcancer$Over60 <- apply(X = na.omit(CVDcancer[, 20:26]), MARGIN = 1, FUN = sum)
+CVDcancer <- CVDcancer[,c("DateByDay", "Region", 
+                          "Over0", "Over20", "Over40", "Over60")]
+CVDcancer$Year <- format(as.Date(CVDcancer$DateByDay), "%Y")
+LiverDiseases$Over0 <- apply(X = na.omit(LiverDiseases[, 7:26]), MARGIN = 1, FUN = sum)
+LiverDiseases$Over20 <- apply(X = na.omit(LiverDiseases[, 12:26]), MARGIN = 1, FUN = sum)
+LiverDiseases$Over40 <- apply(X = na.omit(LiverDiseases[, 16:26]), MARGIN = 1, FUN = sum)
+LiverDiseases$Over60 <- apply(X = na.omit(LiverDiseases[, 20:26]), MARGIN = 1, FUN = sum)
+LiverDiseases <- LiverDiseases[,c("DateByDay", "Region", 
+                                  "Over0", "Over20", "Over40", "Over60")]
+LiverDiseases$Year <- format(as.Date(LiverDiseases$DateByDay), "%Y")
+
+# Rename
+names(CVDcancer) <- c("DateByDay", "Region", "CVDcancerOver0", "CVDcancerOver20", "CVDcancerOver40", "CVDcancerOver60", "Year")
+names(LiverDiseases) <- c("DateByDay", "Region", "LiverOver0", "LiverOver20", "LiverOver40", "LiverOver60", "Year")
+
+# Join
+Health <- CVDcancer %>% left_join(LiverDiseases)
+
+rm(CVDcancer,LiverDiseases)
+```
+
+# SOCIO-ECONOMIC DATA
+Socio-economic data in the UK is available from the Office for National Statistics 
+```{r}
+library(reshape2)
+populationEstimates <- readRDS("~/kehra/data/SocioEconomic/PopulationEstimatesRegions1971_2014.rds")
+populationEstimates <- melt(data = populationEstimates)
+names(populationEstimates) <- c("Code", "Region","Year", "YearlyPopEst")
+populationEstimates$Year <- substr(populationEstimates$Year, 5,8)
+
+HealthSocio <- Health %>% left_join(populationEstimates)
+
+# Standardise mortality counts
+HealthSocio$CVD00 <- HealthSocio$CVDcancerOver0/HealthSocio$YearlyPopEst
+HealthSocio$CVD20 <- HealthSocio$CVDcancerOver20/HealthSocio$YearlyPopEst
+HealthSocio$CVD40 <- HealthSocio$CVDcancerOver40/HealthSocio$YearlyPopEst
+HealthSocio$CVD60 <- HealthSocio$CVDcancerOver60/HealthSocio$YearlyPopEst
+
+HealthSocio$LIV00 <- HealthSocio$LiverOver0/HealthSocio$YearlyPopEst
+HealthSocio$LIV20 <- HealthSocio$LiverOver20/HealthSocio$YearlyPopEst
+HealthSocio$LIV40 <- HealthSocio$LiverOver40/HealthSocio$YearlyPopEst
+HealthSocio$LIV60 <- HealthSocio$LiverOver60/HealthSocio$YearlyPopEst
+
+# Fix inconsistency with name of regions
+HealthSocio$Region <- as.character(HealthSocio$Region)
+HealthSocio$Region[HealthSocio$Region=="North East"] <- "North East (England)"
+HealthSocio$Region[HealthSocio$Region=="South East"] <- "South East (England)"
+HealthSocio$Region[HealthSocio$Region=="North West"] <- "North West (England)"
+HealthSocio$Region[HealthSocio$Region=="South West"] <- "South West (England)"
+HealthSocio$Region[HealthSocio$Region=="East Midlands"] <- "East Midlands (England)"
+HealthSocio$Region[HealthSocio$Region=="West Midlands"] <- "West Midlands (England)"
+
+HealthSocio <- HealthSocio[, c("DateByDay", "Region", "Year",
+                               "CVD00", "CVD20", "CVD40", "CVD60", 
+                               "LIV00", "LIV20", "LIV40", "LIV60")]
+  
+# saveRDS(HealthSocio, "~/kehra/data/HealthSocio_England_1979_2014.rds")
+rm(Health, populationEstimates)
+```
+
+# Build England database
+ 
+```{r}
+HealthSocio <- readRDS("~/kehra/data/HealthSocio_England_1979_2014.rds") 
+exposure <- readRDS("~/kehra/data/exposure_England_1979_2014.rds")
+# Join exposure and healthsocio
+EnglandDB <- exposure %>% left_join(HealthSocio)
+str(EnglandDB)
+
+# For the analysis, variables must be either numeric, factors or ordered factors
+EnglandDB$altitude <- as.numeric(EnglandDB$altitude)
+EnglandDB$la_region_id <- factor(EnglandDB$la_region_id)
+EnglandDB$Region <- factor(EnglandDB$Region)
+EnglandDB$code <- factor(EnglandDB$code)
+EnglandDB$site <- factor(EnglandDB$site)
+EnglandDB$Year <- factor(EnglandDB$Year)
+EnglandDB$Month <- factor(format(EnglandDB$DateByDay, "%m"))
+EnglandDB$Day <- factor(format(EnglandDB$DateByDay, "%d"))
+EnglandDB$Time <- factor(format(EnglandDB$date, "%H"))
+
+EnglandDB <- EnglandDB[,c(# "date", "DateByDay"
+                          "Year", "Month", "Day", "Time",
+                          "code", "site", "site.type", "Region",
+                          "zone_name", "zone_id", "la_region", "la_region_id",
+                          #"date_started", "date_ended", "ratified_to",
+                          "latitude", "longitude", "altitude", "ws", "wd", 
+                          "o3", "so2", "co", "pm10", "pm2.5", "nv2.5", "v2.5",
+                          "nv10", "v10", "no", "no2", "nox",
+                          "TEMP", "WS", "WD", "BLH", "PREC",
+                          "CVD00", "CVD20", "CVD40", "CVD60", 
+                          "LIV00", "LIV20", "LIV40", "LIV60")]
+
+# Check variable types (factor/categorical or numeric)
+str(EnglandDB)
+
+# saveRDS(EnglandDB, "~/kehra/data/EnglandDB_1979_2014.rds")  
+```
