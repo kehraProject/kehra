@@ -19,7 +19,7 @@ install_github("cvitolo/bnlearn")
 library(bnlearn)
 
 # Load the training set
-df <- readRDS("~/r_kehra/data/training.rds")
+df <- readRDS("~/data/training.rds")
 as.data.frame(names(df))
 df <- df[,c(2:24,28)]
 # Check data structure

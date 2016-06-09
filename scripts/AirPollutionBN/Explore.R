@@ -1,5 +1,5 @@
 # Load the full dataset for the UK.
-df <- readRDS("~/r_kehra/data/EnglandDB.rds")
+df <- readRDS("~/data/EnglandDB.rds")
 
 ################################################################################
 # MAKE A MAP OF THE ACTIVE STATIONS ############################################
@@ -11,7 +11,7 @@ library(ggmap)
 source_gist("33baa3a79c5cfef0f6df")
 
 # Load data
-stations <- readRDS("~/r_kehra/data/Pollution/stations.rds")
+stations <- readRDS("~/data/Pollution/stations.rds")
 
 myMAP <- get_map("birmingham, uk",zoom=6)
 ggmap(myMAP)+
@@ -149,13 +149,13 @@ data <-
   mutate(co_c4 = roll_sum(co, 96, align = "right", fill = NA)) %>%
   mutate(co_c5 = roll_sum(co, 120, align = "right", fill = NA))
 
-# saveRDS(data, "~/r_kehra/data/dataset.rds")
+# saveRDS(data, "~/data/dataset.rds")
 
 ################################################################################
 # SPLIT THE DATASET INTO TRAINING AND TESTING SETS #############################
 ################################################################################
 
-data <- readRDS("~/r_kehra/data/dataset.rds")
+data <- readRDS("~/data/dataset.rds")
 
 # Training set contains all the data up to 2007, testing only data for 2008-14
 ind <- which(as.numeric(as.character(data$Year)) <= 2007)
@@ -163,8 +163,8 @@ ind <- which(as.numeric(as.character(data$Year)) <= 2007)
 training <- data[ind, ] # ~77% round(dim(training)[1]/dim(data)[1],2)
 testing <- data[-ind, ] # ~23 round(dim(testing)[1]/dim(data)[1],2)
 
-saveRDS(training, "~/r_kehra/data/training.rds")
-saveRDS(testing, "~/r_kehra/data/testing.rds")
+saveRDS(training, "~/data/training.rds")
+saveRDS(testing, "~/data/testing.rds")
 
 ################################################################################
 # DRAW CORRELATIONMATRIX FOR OBSERVED AND GENERATED VARIABLES ##################
@@ -201,7 +201,7 @@ trainingConOrd <- training[, c("Latitude","Longitude","Altitude",
                                "LIV00","LIV20","LIV40","LIV60")]
 
 completeTraining <- trainingConOrd[complete.cases(trainingConOrd),]
-saveRDS(completeTraining, "~/r_kehra/data/completeTraining.rds")
+saveRDS(completeTraining, "~/data/completeTraining.rds")
 
 library(corrplot)
 corrplot(corr = cor(completeTraining), order = "original")

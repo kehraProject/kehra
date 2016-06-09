@@ -59,7 +59,7 @@ rm(adm,England,stationsSP,x, stationsNew)
 
 # Which region are the stations in?
 library(rgdal)
-Regions <- readOGR(dsn = "/home/claudia/r_kehra/data/GEO/UK/AdminBoundaries/", layer = "Regions")
+Regions <- readOGR(dsn = "/home/claudia/data/GEO/UK/AdminBoundaries/", layer = "Regions")
 Regions <- spTransform(Regions, CRS("+init=epsg:4326"))
 stationsSP <- SpatialPoints(stations[, c('Longitude', 'Latitude')], 
                             proj4string=CRS("+init=epsg:4326"))
@@ -78,14 +78,14 @@ OPENAIRts <- importAURN(site = stations$SiteID, year = 1981:2014,
 
 # How many stations actually have datasets?
 stations <- stations[which(stations$SiteID %in% unique(OPENAIRts$code)),]
-# saveRDS(stations, "~/r_kehra/data/Pollution/stations.rds")
+# saveRDS(stations, "~/data/Pollution/stations.rds")
 
 # Clean up OPENAIRts
 OPENAIRts <- OPENAIRts[, c("code", "date", "pm10", "pm2.5", "no2", "o3", "so2", "co")]
 names(OPENAIRts) <- c("SiteID", "datetime", "pm10", "pm2.5", "no2", "o3", "so2", "co")
 OPENAIRts$SiteID <- as.character(OPENAIRts$SiteID)
 OPENAIRts$datetime <- as.character(OPENAIRts$datetime)
-# saveRDS(OPENAIRts, "~/r_kehra/data/Pollution/pollutionTEMP.rds")
+# saveRDS(OPENAIRts, "~/data/Pollution/pollutionTEMP.rds")
 
 # Infill missing values using linear interpolation (maxgap = 12)
 library(parallel)
@@ -139,14 +139,14 @@ pollution <- left_join(pollution, O3, by=c("datetime", "SiteID"))
 pollution <- left_join(pollution, SO2, by=c("datetime", "SiteID"))
 pollution <- left_join(pollution, CO, by=c("datetime", "SiteID"))
 
-# saveRDS(pollution, "~/r_kehra/data/Pollution/pollution.rds")
+# saveRDS(pollution, "~/data/Pollution/pollution.rds")
 
 ################################################################################
 # ADD CLIMATE DATA #############################################################
 ################################################################################
 
 rm(list=ls(all=TRUE))
-stations <- readRDS("~/r_kehra/data/Pollution/stations.rds")
+stations <- readRDS("~/data/Pollution/stations.rds")
 
 # CLIMATE DATA
 library(ncdf4)
@@ -160,43 +160,43 @@ years <- 1981:2014
 t2mI <- mclapply(X = years, 
                  FUN = pointInspection, mc.cores = length(years),
                  points = stations, var = "t2m", prefix = "climate",  # or "climate"
-                 path = "~/r_kehra/data/Climate", parallel = TRUE)
+                 path = "~/data/Climate", parallel = TRUE)
 t2m <- do.call(rbind.data.frame, t2mI); rm(t2mI)
 
 u10I <- mclapply(X = years, 
                  FUN = pointInspection, mc.cores = length(years),
                  points = stations, var = "u10", prefix = "climate",  # or "climate"
-                 path = "~/r_kehra/data/Climate", parallel = TRUE)
+                 path = "~/data/Climate", parallel = TRUE)
 u10 <- do.call(rbind.data.frame, u10I); rm(u10I)
 
 v10I <- mclapply(X = years, 
                  FUN = pointInspection, mc.cores = length(years),
                  points = stations, var = "v10", prefix = "climate",  # or "climate"
-                 path = "~/r_kehra/data/Climate", parallel = TRUE)
+                 path = "~/data/Climate", parallel = TRUE)
 v10 <- do.call(rbind.data.frame, v10I); rm(v10I)
 
 tpI <- mclapply(X = years, 
                 FUN = pointInspection, mc.cores = length(years),
                 points = stations, var = "tp", prefix = "climate",  # or "climate"
-                path = "~/r_kehra/data/Climate", parallel = TRUE)
+                path = "~/data/Climate", parallel = TRUE)
 tp <- do.call(rbind.data.frame, tpI); rm(tpI)
 
 blhI <- mclapply(X = years, 
                  FUN = pointInspection, mc.cores = length(years),
                  points = stations, var = "blh", prefix = "climate",  # or "climate"
-                 path = "~/r_kehra/data/Climate", parallel = TRUE)
+                 path = "~/data/Climate", parallel = TRUE)
 blh <- do.call(rbind.data.frame, blhI); rm(blhI)
 
 ssrI <- mclapply(X = years, 
                  FUN = pointInspection, mc.cores = length(years),
                  points = stations, var = "ssr", prefix = "PBR", # or "climate"
-                 path = "~/r_kehra/data/Climate", parallel = TRUE)
+                 path = "~/data/Climate", parallel = TRUE)
 ssr <- do.call(rbind.data.frame, ssrI); rm(ssrI)
 
-# save(t2m, u10, v10, tp,blh,ssr, file = "~/r_kehra/data/Climate/climateTEMP.rda")
+# save(t2m, u10, v10, tp,blh,ssr, file = "~/data/Climate/climateTEMP.rda")
 # rm(list=ls(all=TRUE))
 # gc()
-# load("~/r_kehra/data/Climate/climateTEMP.rda")
+# load("~/data/Climate/climateTEMP.rda")
 
 # Infill missing values using linear interpolation
 t2mI <- mclapply(X = unique(t2m$SiteID), 
@@ -235,10 +235,10 @@ ws <- u10[, 1:2]; ws$ws <- wsI
 wdI <- mapply(windDirection, u10$u10, v10$v10)
 wd <- u10[, 1:2]; wd$wd <- wdI
 
-# save(t2m, ws, wd, tp, blh, ssr, file = "~/r_kehra/data/Climate/climateTEMP2.rda")
+# save(t2m, ws, wd, tp, blh, ssr, file = "~/data/Climate/climateTEMP2.rda")
 # rm(list=ls(all=TRUE))
 # gc()
-# load("~/r_kehra/data/Climate/climateTEMP2.rda")
+# load("~/data/Climate/climateTEMP2.rda")
 
 library(dplyr)
 # Fix data types before joining tables to avoid problems with factors
@@ -250,7 +250,7 @@ clima <- left_join(clima, tp, by=c("datetime", "SiteID"))
 clima <- left_join(clima, blh, by=c("datetime", "SiteID"))
 clima <- left_join(clima, ssr, by=c("datetime", "SiteID"))
 
-# saveRDS(clima, "~/r_kehra/data/Climate/clima.rds")
+# saveRDS(clima, "~/data/Climate/clima.rds")
 
 ################################################################################
 # ADD HEALTH DATA ##############################################################
@@ -264,50 +264,50 @@ rm(list=ls(all=TRUE))
 
 library(gdata)
 
-Deaths <- read.xls("~/r_kehra/data/Health/ONS_purchasedData/1981to1983.xls", 
+Deaths <- read.xls("~/data/Health/ONS_purchasedData/1981to1983.xls", 
                    sheet = "Table 1", header = TRUE, skip=7)
 Deaths[1,]
 # Create the first batch of data
 CVDcancer <- Deaths[Deaths$Cause == "CVD and Cancer",]
 LiverDiseases <- Deaths[Deaths$Cause == "Liver Diseases",]
 
-Deaths <- read.xls("~/r_kehra/data/Health/ONS_purchasedData/1984to1987.xls", 
+Deaths <- read.xls("~/data/Health/ONS_purchasedData/1984to1987.xls", 
                    sheet = "Table 1", header = TRUE, skip=7)
 # Append new data
 CVDcancer <- rbind(CVDcancer, Deaths[Deaths$Cause == "CVD and Cancer",])
 LiverDiseases <- rbind(LiverDiseases, Deaths[Deaths$Cause == "Liver Diseases",])
 
-Deaths <- read.xls("~/r_kehra/data/Health/ONS_purchasedData/1988to1992.xls", 
+Deaths <- read.xls("~/data/Health/ONS_purchasedData/1988to1992.xls", 
                    sheet = "Table 1", header = TRUE, skip=7)
 # Append new data
 CVDcancer <- rbind(CVDcancer, Deaths[Deaths$Cause == "CVD and Cancer",])
 LiverDiseases <- rbind(LiverDiseases, Deaths[Deaths$Cause == "Liver Diseases",])
 
-Deaths <- read.xls("~/r_kehra/data/Health/ONS_purchasedData/1993to1995.xls", 
+Deaths <- read.xls("~/data/Health/ONS_purchasedData/1993to1995.xls", 
                    sheet = "Table 1", header = TRUE, skip=7)
 # Append new data
 CVDcancer <- rbind(CVDcancer, Deaths[Deaths$Cause == "CVD and Cancer",])
 LiverDiseases <- rbind(LiverDiseases, Deaths[Deaths$Cause == "Liver Diseases",])
 
-Deaths <- read.xls("~/r_kehra/data/Health/ONS_purchasedData/1996to2000.xls", 
+Deaths <- read.xls("~/data/Health/ONS_purchasedData/1996to2000.xls", 
                    sheet = "Table 1", header = TRUE, skip=7)
 # Append new data
 CVDcancer <- rbind(CVDcancer, Deaths[Deaths$Cause == "CVD and Cancer",])
 LiverDiseases <- rbind(LiverDiseases, Deaths[Deaths$Cause == "Liver Diseases",])
 
-Deaths <- read.xls("~/r_kehra/data/Health/ONS_purchasedData/20012005.xls", 
+Deaths <- read.xls("~/data/Health/ONS_purchasedData/20012005.xls", 
                    sheet = "Table 1", header = TRUE, skip=7)
 # Append new data
 CVDcancer <- rbind(CVDcancer, Deaths[Deaths$Cause == "CVD and Cancer",])
 LiverDiseases <- rbind(LiverDiseases, Deaths[Deaths$Cause == "Liver Diseases",])
 
-Deaths <- read.xls("~/r_kehra/data/Health/ONS_purchasedData/20062010.xls", 
+Deaths <- read.xls("~/data/Health/ONS_purchasedData/20062010.xls", 
                    sheet = "Table 1", header = TRUE, skip=7)
 # Append new data
 CVDcancer <- rbind(CVDcancer, Deaths[Deaths$Cause == "CVD and Cancer",])
 LiverDiseases <- rbind(LiverDiseases, Deaths[Deaths$Cause == "Liver Diseases",])
 
-Deaths <- read.xls("~/r_kehra/data/Health/ONS_purchasedData/20112014.xls", 
+Deaths <- read.xls("~/data/Health/ONS_purchasedData/20112014.xls", 
                    sheet = "Table 1", header = TRUE, skip=7)
 # Append new data
 CVDcancer <- rbind(CVDcancer, Deaths[Deaths$Cause == "CVD and Cancer",])
@@ -362,7 +362,7 @@ rm(CVDcancer,LiverDiseases)
 # Socio-economic data in the UK is available from the Office for National Statistics 
 
 library(reshape2)
-populationEstimates <- readRDS("~/r_kehra/data/SocioEconomic/PopulationEstimatesRegions1971_2014.rds")
+populationEstimates <- readRDS("~/data/SocioEconomic/PopulationEstimatesRegions1971_2014.rds")
 populationEstimates[,1:2] <- sapply(populationEstimates[,1:2], as.character)
 populationEstimates[,3:46] <- sapply(populationEstimates[,3:46], as.numeric)
 populationEstimates <- melt(data = populationEstimates[, 2:46])
@@ -394,7 +394,7 @@ HealthSocio <- HealthSocio[, c("DateByDay", "Region", "Year",
                                "CVD00", "CVD20", "CVD40", "CVD60",
                                "LIV00", "LIV20", "LIV40", "LIV60")]
 
-# saveRDS(HealthSocio, "~/r_kehra/data/Health/HealthSocio.rds")
+# saveRDS(HealthSocio, "~/data/Health/HealthSocio.rds")
 # rm(list=ls(all=TRUE))
 
 # Build England database #######################################################
@@ -405,12 +405,12 @@ system("awk '/MemFree/ {print $2}' /proc/meminfo", intern=TRUE)
 gc()
 
 # Load pollution data and join with climate data
-clima <- readRDS("~/r_kehra/data/Climate/clima.rds")
-pollution <- readRDS("~/r_kehra/data/Pollution/pollution.rds")
+clima <- readRDS("~/data/Climate/clima.rds")
+pollution <- readRDS("~/data/Pollution/pollution.rds")
 str(clima);str(pollution)
 exposure <- full_join(clima, pollution, by=c("datetime", "SiteID"))
 
-# saveRDS(exposure, "~/r_kehra/data/exposure.rds")
+# saveRDS(exposure, "~/data/exposure.rds")
 # rm(clima, pollution)
 # gc()
 
@@ -423,14 +423,14 @@ exposure$Day <- as.character(format(as.POSIXlt(exposure$datetime), "%d"))
 exposure$Hour <- as.character(format(as.POSIXlt(exposure$datetime), "%H"))
 exposure$Season <- as.character(getSeason(as.Date(exposure$DateByDay)))
 head(exposure)
-# saveRDS(exposure, "~/r_kehra/data/exposure.rds")
+# saveRDS(exposure, "~/data/exposure.rds")
 
 # Join with stations to get the region/zone/type of monitoring
-stations <- readRDS("~/r_kehra/data/Pollution/stations.rds")
+stations <- readRDS("~/data/Pollution/stations.rds")
 expStation <- exposure %>% left_join(stations, by = "SiteID")
 
 # Join exposure and healthsocio
-HealthSocio <- readRDS("~/r_kehra/data/Health/HealthSocio.rds")
+HealthSocio <- readRDS("~/data/Health/HealthSocio.rds")
 EnglandDB <- expStation %>% left_join(HealthSocio, 
                                       by = c("DateByDay", "Region", "Year"))
 
@@ -458,4 +458,4 @@ db <- EnglandDB[,c("SiteID", "Region", "Zone", "Environment.Type",
                    "LIV00", "LIV20", "LIV40", "LIV60")]
 names(db)[4] <- "Type"
 
-# saveRDS(db, "~/r_kehra/data/EnglandDB.rds")
+# saveRDS(db, "~/data/EnglandDB.rds")
