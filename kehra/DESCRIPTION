@@ -1,8 +1,8 @@
 Package: kehra
 Type: Package
-Title: An R package to collect, assemble and model air pollution, weather and health data
+Title: Collect, assemble and model air pollution, weather and health data
 Version: 0.1
-Date: 2016-05-17
+Date: 2016-06-09
 Author: Claudia Vitolo [aut, cre], Allan Tucker [aut], Andrew Russell [aut]
 Maintainer: Claudia Vitolo <cvitolodev@gmail.com>
 URL: https://github.com/kehraProject/r_kehra
