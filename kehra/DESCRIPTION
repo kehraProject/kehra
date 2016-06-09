@@ -11,5 +11,5 @@ Description: Collection of utility functions used in the KEHRA project. It refer
 Depends: R (>= 2.14.0)
 Imports: Hmisc, raster, reshape2, stringr, sp, xts, zoo
 License: GPL-3
-Repository: GitHub
+Repository: CRAN
 RoxygenNote: 5.0.1

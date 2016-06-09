@@ -1,7 +1,7 @@
 kehra: an R package to collect, assemble and model air pollution, weather and health data
 =======
 
-[![DOI](https://zenodo.org/badge/9118/cvitolo/r_kehra.svg)](https://zenodo.org/badge/latestdoi/9118/cvitolo/r_kehra)
+[![DOI](https://zenodo.org/badge/9118/cvitolo/r_kehra.svg)](https://zenodo.org/badge/55284/9118/cvitolo/r_kehra)
 [![CRAN Status Badge](http://www.r-pkg.org/badges/version/kehra)](http://cran.r-project.org/web/packages/kehra)
 [![CRAN Total Downloads](http://cranlogs.r-pkg.org/badges/grand-total/kehra)](http://cran.rstudio.com/web/packages/kehra/index.html)
 [![CRAN Monthly Downloads](http://cranlogs.r-pkg.org/badges/kehra)](http://cran.rstudio.com/web/packages/kehra/index.html)
