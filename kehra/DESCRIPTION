@@ -1,6 +1,6 @@
 Package: kehra
 Type: Package
-Title: Collect, assemble and model air pollution, weather and health data
+Title: Collect, Assemble and Model Air Pollution, Weather and Health Data
 Version: 0.1
 Date: 2016-06-09
 Author: Claudia Vitolo [aut, cre], Allan Tucker [aut], Andrew Russell [aut]
