@@ -8,6 +8,10 @@ kehra: an R package to collect, assemble and model air pollution, weather and he
 
 Collect, assemble and model air pollution, weather and health data is a Big Data problem. Here are some utility functions developed as part of the British Council's funded KEHRA project.
 
+**To cite this software:** 
+
+Vitolo C., Tucker A. and Russell A. (2016). kehra: Collect, assemble and model air pollution, weather and health data. R package version 0.1.  https://CRAN.R-project.org/package=kehra. DOI: http://dx.doi.org/10.5281/zenodo.55284
+
 # Dependencies
 The kehra package is dependent on a number of CRAN packages. Install them first:
 
