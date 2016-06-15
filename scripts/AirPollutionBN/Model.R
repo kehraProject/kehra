@@ -18,12 +18,12 @@ library(devtools)
 install_github("cvitolo/bnlearn")
 
 # load parallel and bnlearn and rsprng.
-library(parallel)
-library(bnlearn)
-cl <- makeCluster(detectCores()-1)
+# library(parallel)
+# cl <- makeCluster(detectCores()-1)
 # check it works.
 # clusterEvalQ(cl, runif(10))
 
+library(bnlearn)
 # Load the training set
 df <- readRDS("~/data/training.rds") # as.data.frame(names(df))
 df <- df[,c(2:24,28)] # Check data structure with str(df)
@@ -46,7 +46,7 @@ dfc <- df[complete.cases(df), ]
 dag <- empty.graph(names(dfc)); graphviz.plot(dag)
 bn <- bn.fit(dag, dfc)                                       # node.ordering(bn)
 
-# Define blacklist
+# Define blacklist to apply to future changes in bn
 bl <- data.frame("from" = c(rep("Region",10),
                             rep("Zone",10),
                             rep("Type",10),
@@ -113,8 +113,8 @@ for (i in 24:19) { # i <- 24
   currentComplete <- current[complete.cases(current),]
   # call a learning function passing the cluster object (the return value of the 
   # previous makeCluster() call) as a parameter.
-  dag <- hc(currentComplete, blacklist = bl)
-  bn <- bn.fit(dag, currentComplete)
+  dag <- hc(currentComplete, blacklist = bl, debug = TRUE)
+  bn <- bn.fit(dag, currentComplete, debug = TRUE)
   
   graphviz.plot(dag)
   readline(prompt="Press [enter] to continue") 
@@ -124,7 +124,7 @@ for (i in 24:19) { # i <- 24
 # }
 
 # stop the cluster.
-stopCluster(cl)
+# stopCluster(cl)
 
 graphviz.plot(dag, highlight = NULL, layout = "dot",
               shape = "circle", main = NULL, sub = NULL)
