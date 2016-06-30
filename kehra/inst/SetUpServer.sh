@@ -5,6 +5,9 @@
 # openssh
 # PostgreSQL
 
+# To manipulate images
+sudo apt-get install imagemagick --fix-missing
+
 ######### R + RStudioServer + Shiny Server #####################################
 
 ### Install R from imperial CRAN mirror ###
@@ -121,3 +124,12 @@ sudo -u postgres psql -c "CREATE EXTENSION postgis; CREATE EXTENSION postgis_top
 ### ECMWF API for python 2.7 ###################################################
 sudo apt-get -y install python-pip
 sudo pip2 install ecmwf-api-client
+# create a file called .ecmwfapirc and save it in the home folder. 
+# The content of the file should be as follows:
+# {
+#     "url"   : "https://api.ecmwf.int/v1",
+#     "key"   : "XXXXXXXXXXXXXXXXXXXXXX",
+#     "email" : "john.smith@example.com"
+# }
+# See instructions at: 
+# https://software.ecmwf.int/wiki/display/WEBAPI/Accessing+ECMWF+data+servers+in+batch
