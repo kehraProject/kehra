@@ -647,20 +647,22 @@ pctY <- round(slicesY/sum(slicesY)*100)
 lblsY <- paste(lblsY, pctY) # add percents to labels 
 lblsY <- paste(lblsY,"%",sep="") # ad % to labels 
 
-# Default size
+# Default settings
 size <- 480 # px
+library(RColorBrewer)
+colors <- brewer.pal(10, "Set3")
 
 # chart Regions
-png("Regions.png",
+png("Regions.png", 
     width = size*3, height = size*2, units = "px", pointsize = 12, res=150)
-pie(slicesX, labels = lblsX, col=rainbow(length(lblsX)),
+pie(slicesX, labels = lblsX, col=colors[1:length(slicesX)],
     main="Regions")
 dev.off()
 
 # Chart Types
-png(file = "Types.png",
+png(file = "Types.png", 
     width = size*3, height = size*2, units = "px", pointsize = 12, res=150)
-pie(slicesY,labels = lblsY, col=rainbow(length(lblsY)),
+pie(slicesY,labels = lblsY, col=colors[1:length(slicesY)],
     main="Types")
 dev.off()
 
