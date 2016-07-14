@@ -647,22 +647,20 @@ pctY <- round(slicesY/sum(slicesY)*100)
 lblsY <- paste(lblsY, pctY) # add percents to labels 
 lblsY <- paste(lblsY,"%",sep="") # ad % to labels 
 
-# Default settings
+# Default size
 size <- 480 # px
-library(RColorBrewer)
-colors <- brewer.pal(10, "Set3")
 
 # chart Regions
-png("Regions.png", 
+png("Regions.png",
     width = size*3, height = size*2, units = "px", pointsize = 12, res=150)
-pie(slicesX, labels = lblsX, col=colors[1:length(slicesX)],
+pie(slicesX, labels = lblsX, col=rainbow(length(lblsX)),
     main="Regions")
 dev.off()
 
 # Chart Types
-png(file = "Types.png", 
+png(file = "Types.png",
     width = size*3, height = size*2, units = "px", pointsize = 12, res=150)
-pie(slicesY,labels = lblsY, col=colors[1:length(slicesY)],
+pie(slicesY,labels = lblsY, col=rainbow(length(lblsY)),
     main="Types")
 dev.off()
 
@@ -686,7 +684,7 @@ rm(x, y, lblsX, lblsY, pctX, pctY, size, slicesX, slicesY)
 # install.packages(c("Matrix", "igraph", "Rcpp"))
 # install.packages("gRbase")
 # install.packages("gRain")
-install.packages("bnlearn")
+# install.packages("bnlearn")
 
 library(bnlearn)
 
@@ -708,109 +706,179 @@ training <- training[-which(is.na(training$CVD60)), ]
 training <- droplevels(training[, names(sort(colSums(is.na(training))))])
 # saveRDS(training, "database_BeforeEM_allObsFeatures.rds")
 
-### Define blacklist to apply to future changes in bn ##########################
-bl <- data.frame("from" = c(rep("Region",10),
-                            rep("Zone",10),
-                            rep("Type",10),
-                            rep("Year",10),
-                            rep("Season",10),
-                            rep("Month",10),
-                            rep("Day",10),
-                            rep("Hour",10),
-                            rep("Latitude",10),
-                            rep("Longitude",10),
-                            rep("Altitude",10),
-                            rep("CVD60",24)), 
-                 "to" = c("Zone", "Type", "Year", "Season", "Month", "Day", 
-                          "Hour", "Latitude", "Longitude", "Altitude",
-                          "Region", "Type", "Year", "Season", "Month", "Day",
-                          "Hour", "Latitude", "Longitude", "Altitude",
-                          "Region", "Zone", "Year", "Season", "Month", "Day", 
-                          "Hour", "Latitude", "Longitude", "Altitude",
-                          "Region", "Zone", "Type", "Season", "Month", "Day", 
-                          "Hour", "Latitude", "Longitude", "Altitude",
-                          "Region", "Zone", "Type", "Year", "Month", "Day", 
-                          "Hour", "Latitude", "Longitude", "Altitude",
-                          "Region", "Zone", "Type", "Year", "Season", "Day", 
-                          "Hour", "Latitude", "Longitude", "Altitude",
-                          "Region", "Zone", "Type", "Year", "Season", "Month", 
-                          "Hour", "Latitude", "Longitude", "Altitude",
-                          "Region", "Zone", "Type", "Year", "Season", "Month", 
-                          "Day", "Latitude", "Longitude", "Altitude",
-                          "Region", "Zone", "Type", "Year", "Season", "Month", 
-                          "Day", "Hour", "Longitude", "Altitude",
-                          "Region", "Zone", "Type", "Year", "Season", "Month", 
-                          "Day", "Hour", "Latitude", "Altitude",
-                          "Region", "Zone", "Type", "Year", "Season", "Month", 
-                          "Day", "Hour", "Latitude", "Longitude",
-                          "Region", "Zone", "Type", "Year", "Season", "Month", 
-                          "Day", "Hour", "Latitude", "Longitude", "Altitude",
-                          ))
+### Define blacklist to apply to future changes of the BN ######################
+library(bnlearn)
+training <- readRDS("/var/data/Modelling/UK/database_BeforeEM_allObsFeatures.rds")
 
 # Imputing Missing Data With Expectation – Maximization
 # initialise using the empty graph and complete observations.
-firstCompleteObservations <- which(complete.cases(training))
-trainingc <- training[firstCompleteObservations, ]
+rowsCompleteObservations <- which(complete.cases(training))
+completeObservations <- training[rowsCompleteObservations, ]
 
-dag <- empty.graph(names(trainingc))
-bn <- bn.fit(dag, trainingc)                                 # node.ordering(bn)
+dag <- empty.graph(names(completeObservations))
+bnTarget <- bn.fit(dag, completeObservations)          # node.ordering(bnTarget)
 
-# Iterate and check for convergence tracking the likelihood of the dag 
-# with regards to the original complete observations
-current <- training
+# which variables have missing values?
+which.missing <- names(which(sapply(training, function(x) anyNA(x))))
 
-# keep track of the log-Likelihood
-logLikelihood <- logLik(object = dag, 
-                        data = current[firstCompleteObservations, ])
+loopNumber <- 1
 
-for (j in 1:10){ # check convergence at each loop # j <- 1
+repeat{
   
-  for (i in 23:19) { # i <- 24
-    
-    # what is the name of the column to fill in?
-    colName <- names(current)[i]
-    print(colName)
-    # extract the set of complete observations (ignoring only column i)
-    completeRows <- which(complete.cases(current[,-i]))
-    trainingc <- current[completeRows, ]
-    # within the above table, what are the values of column i?
-    colValues <- eval(parse(text = paste("current$", colName, 
-                                         "[completeRows]", sep = "")))
-    # in what rows we have NA?
-    naRows <- which(is.na(colValues))
-    
-    # Discard columns with zero or near-zero variance
-    col2remove <- c()
-    for (nCol in names(which(sapply(trainingc, class) == 'factor'))){
-      stringCol <- paste("bn$", nCol, "$prob", sep = "")
-      levelsCol <- names(which( eval(parse(text = stringCol)) != 0 ))
-      if (!all(unique(current[,nCol]) %in% levelsCol)) {
-        # if (length(levelsCol) <= 1) {
-        col2remove <- c(col2remove, nCol) 
-      }
+  print(paste("Loop n.", loopNumber, sep = ""))
+  
+  # E: replacing all missing values with their (E)xpectation.
+  current <- training
+  
+  # Discard columns with zero or near-zero variance
+  col2remove <- c()
+  for (nCol in names(which(sapply(current, class) == 'factor'))){
+    stringCol <- paste("bnTarget$", nCol, "$prob", sep = "")
+    levelsCol <- names(which( eval(parse(text = stringCol)) != 0 ))
+    if (!all(unique(current[,nCol]) %in% levelsCol)) {
+      # if (length(levelsCol) <= 1) {
+      col2remove <- c(col2remove, nCol) 
     }
-    col2remove <- which(names(current) %in% col2remove)
+  }
+  col2remove <- which(names(current) %in% col2remove)
+  # names(current)[col2remove] # "Region" "Zone"   "Type"   "Year"
+  # unique(current$Region[rowsCompleteObservations])
+  # unique(current$Zone[rowsCompleteObservations])
+  # unique(current$Type[rowsCompleteObservations])
+  # unique(current$Year[rowsCompleteObservations])
+  
+  current <- current[, -col2remove]
+  
+  # iterate over all the variables with missing data
+  for (myVar in which.missing) {                     # myVar <- which.missing[1]
     
-    # E: replacing missing values with their (E)xpectation
-    E <- predict(object = bn, 
-                 node = colName, 
-                 data = trainingc[,-c(col2remove,i)],
-                 method = "bayes-lw")
-    current[completeRows[naRows], colName] <- E[naRows]
+    print(myVar)
     
-    # M: learning the model that (M)aximises the score with the current data.
-    trainingc <- current[complete.cases(current),]
+    # variables that do no have any missing value for the observations/variable
+    # combination we are imputing in this iteration.
+    complete.variables <- which(sapply(current[is.na(current[, myVar]),
+                                               ], function(x) !anyNA(x)))
+    complete.predictors <- current[is.na(current[, myVar]),
+                                   complete.variables, drop = FALSE]
     
-    dag <- hc(trainingc, blacklist = bl, debug = TRUE)
-    graphviz.plot(dag)
+    current[is.na(current[, myVar]), myVar] <-
+      predict(object = bnTarget, 
+              node = myVar, 
+              data = complete.predictors, 
+              method = "bayes-lw")
     
-    bn <- bn.fit(dag, trainingc, debug = TRUE)
-    # readline(prompt="Press [enter] to continue") 
+  }
+  
+  # M: learning the model that (M)aximises the score with the current data,
+  # after we have imputed all the missing data in all the variables.
+  completeObservations <- current[complete.cases(current),]
+  
+  # Define blacklist
+  bl <- data.frame("from" = c(rep("Region",10),
+                              rep("Zone",10),
+                              rep("Type",10),
+                              rep("Year",10),
+                              rep("Season",10),
+                              rep("Month",10),
+                              rep("Day",10),
+                              rep("Hour",10),
+                              rep("Latitude",10),
+                              rep("Longitude",10),
+                              rep("Altitude",10),
+                              rep("CVD60",23),
+                              rep("t2m",11),
+                              rep("ws",11),
+                              rep("wd",11),
+                              rep("tp",11),
+                              rep("blh",11),
+                              rep("ssr",11),
+                              rep("no2",11),
+                              rep("so2",11),
+                              rep("co",11),
+                              rep("o3",11),
+                              rep("pm10",11),
+                              rep("pm2.5",11)),
+                   "to" = c("Zone", "Type", "Year", "Season", "Month", "Day", 
+                            "Hour", "Latitude", "Longitude", "Altitude",
+                            "Region", "Type", "Year", "Season", "Month", "Day",
+                            "Hour", "Latitude", "Longitude", "Altitude",
+                            "Region", "Zone", "Year", "Season", "Month", "Day", 
+                            "Hour", "Latitude", "Longitude", "Altitude",
+                            "Region", "Zone", "Type", "Season", "Month", "Day", 
+                            "Hour", "Latitude", "Longitude", "Altitude",
+                            "Region", "Zone", "Type", "Year", "Month", "Day", 
+                            "Hour", "Latitude", "Longitude", "Altitude",
+                            "Region", "Zone", "Type", "Year", "Season", "Day", 
+                            "Hour", "Latitude", "Longitude", "Altitude",
+                            "Region", "Zone", "Type", "Year", "Season", "Month", 
+                            "Hour", "Latitude", "Longitude", "Altitude",
+                            "Region", "Zone", "Type", "Year", "Season", "Month", 
+                            "Day", "Latitude", "Longitude", "Altitude",
+                            "Region", "Zone", "Type", "Year", "Season", "Month", 
+                            "Day", "Hour", "Longitude", "Altitude",
+                            "Region", "Zone", "Type", "Year", "Season", "Month", 
+                            "Day", "Hour", "Latitude", "Altitude",
+                            "Region", "Zone", "Type", "Year", "Season", "Month", 
+                            "Day", "Hour", "Latitude", "Longitude",
+                            "Region","Zone","Type",
+                            "Year","Season","Month","Day","Hour",
+                            "Latitude","Longitude","Altitude",
+                            "t2m","ws","wd","tp","blh","ssr",
+                            "no2","o3","so2","co","pm10","pm2.5",
+                            "Region","Zone","Type",
+                            "Year","Season","Month","Day","Hour",
+                            "Latitude","Longitude","Altitude",
+                            "Region","Zone","Type",
+                            "Year","Season","Month","Day","Hour",
+                            "Latitude","Longitude","Altitude",
+                            "Region","Zone","Type",
+                            "Year","Season","Month","Day","Hour",
+                            "Latitude","Longitude","Altitude",
+                            "Region","Zone","Type",
+                            "Year","Season","Month","Day","Hour",
+                            "Latitude","Longitude","Altitude",
+                            "Region","Zone","Type",
+                            "Year","Season","Month","Day","Hour",
+                            "Latitude","Longitude","Altitude",
+                            "Region","Zone","Type",
+                            "Year","Season","Month","Day","Hour",
+                            "Latitude","Longitude","Altitude",
+                            "Region","Zone","Type",
+                            "Year","Season","Month","Day","Hour",
+                            "Latitude","Longitude","Altitude",
+                            "Region","Zone","Type",
+                            "Year","Season","Month","Day","Hour",
+                            "Latitude","Longitude","Altitude",
+                            "Region","Zone","Type",
+                            "Year","Season","Month","Day","Hour",
+                            "Latitude","Longitude","Altitude",
+                            "Region","Zone","Type",
+                            "Year","Season","Month","Day","Hour",
+                            "Latitude","Longitude","Altitude",
+                            "Region","Zone","Type",
+                            "Year","Season","Month","Day","Hour",
+                            "Latitude","Longitude","Altitude",
+                            "Region","Zone","Type",
+                            "Year","Season","Month","Day","Hour",
+                            "Latitude","Longitude","Altitude"))
+  
+  bl <- bl[!(bl$from %in% names(training)[col2remove] | 
+               bl$to %in% names(training)[col2remove]),]
+  
+  dagNew <- hc(completeObservations, blacklist = bl) # , debug = TRUE
+  graphviz.plot(dagNew)
+  
+  bnCurrent <- bn.fit(dag, completeObservations) # , debug = TRUE
+  
+  test <- compare(target = bnTarget, current = bnCurrent, arcs = TRUE)
+  
+  if(test$tp - dim()){
     
-    # keep track of the log-Likelihood at each round of iteration
-    logLikelihood <- c(logLikelihood, 
-                       logLik(object = dag, 
-                              data = current[firstCompleteObservations, ]))
+    break
+    
+  }else{
+    
+    dag1 <- dag2
     
   }
   
