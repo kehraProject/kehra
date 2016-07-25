@@ -6,7 +6,7 @@
 # Last updated: June 2016                                                      #
 ################################################################################
 
-# Create data folder in the home folder and set it as working directory 
+# Create data folder in the home folder and set it as working directory
 system("mkdir ~/data")
 setwd("~/data")
 
@@ -51,10 +51,10 @@ stations$Zone <- as.character(stations$Zone)
 stations$Region <- as.character(stations$Region)
 
 # Which stations are in England?
-library(raster) 
+library(raster)
 adm <- getData('GADM', country='GBR', level=1)
 England <- adm[adm$NAME_1=='England',]
-stationsSP <- SpatialPoints(stations[, c('Longitude', 'Latitude')], 
+stationsSP <- SpatialPoints(stations[, c('Longitude', 'Latitude')],
                             proj4string=CRS(proj4string(England)))
 
 library(sp)
@@ -76,70 +76,70 @@ rm(stationsSP, x, reg, regions)
 
 # Load modified openair::importAURN() that allows to retrieve data without
 # exceeding max number of open connections
-importAURN_CV <- function(site = "my1", year = 2009, 
+importAURN_CV <- function(site = "my1", year = 2009,
                           pollutant = "all", hc = FALSE) {
-  
+
   site <- toupper(site)
-  
+
   files <- lapply(site, function (x) paste(x, "_", year, sep = ""))
-  
+
   files <- do.call(c, files)
-  
-  
+
+
   loadData <- function(x) {
     tryCatch({
-      fileName <- paste("http://uk-air.defra.gov.uk/openair/R_data/", 
+      fileName <- paste("http://uk-air.defra.gov.uk/openair/R_data/",
                         x, ".RData", sep = "")
       con <- url(fileName, method = "libcurl")
       load(con)
-      
+
       closeAllConnections()
-      
+
       dat <- get(x)
-      
+
       return(dat)
     },
     error = function(ex) {cat(x, "does not exist - ignoring that one.\n")})
-    
+
   }
-  
-  
+
+
   thedata <- plyr::ldply(files, loadData)
-  
+
   if (nrow(thedata) == 0) return() ## no data
-  
+
   ## suppress warnings for now - unequal factors, harmless
-  
-  if (is.null(thedata)) stop("No data to import - check site codes and year.", 
+
+  if (is.null(thedata)) stop("No data to import - check site codes and year.",
                              call. = FALSE)
-  
+
   thedata$site <- factor(thedata$site, levels = unique(thedata$site))
-  
+
   ## change names
   names(thedata) <- tolower(names(thedata))
-  
+
   ## change nox as no2
   id <- which(names(thedata) %in% "noxasno2")
   if (length(id) == 1) names(thedata)[id] <- "nox"
-  
-  
+
+
   ## should hydrocarbons be imported?
   if (hc) {
     thedata <- thedata
   } else {
     ## no hydrocarbons - therefore select conventional pollutants
-    theNames <- c("date", 
+    theNames <- c("date",
                   "co", "nox", "no2", "no", "o3", "so2", "pm10", "pm2.5",
                   "v10", "v2.5", "nv10", "nv2.5", "ws", "wd", "code", "site")
-    
+
     thedata <- thedata[,  which(names(thedata) %in% theNames)]
   }
-  
+
   ## if particular pollutants have been selected
-  if (pollutant != "all") thedata <- thedata[, c("date", pollutant, 
+  if (pollutant != "all") thedata <- thedata[, c("date", pollutant,
                                                  "site", "code")]
-  
-  
+
+
   ## warning about recent, possibly unratified data
   timeDiff <- difftime(Sys.time(),  max(thedata$date), units='days')
   if (timeDiff < 180) {
@@ -147,17 +147,17 @@ importAURN_CV <- function(site = "my1", year = 2009,
                   "\n This most recent data is not yet ratified and may be",
                   "changed\n during the QA/QC process. For complete",
                   "information about the \nratification status of a data set,",
-                  "please use the online tool at:\n", 
+                  "please use the online tool at:\n",
                   paste("http://www.airquality.co.uk/data_and_statistics.php?",
                         "action=da_1&go=Go", sep = ""))
   }
-  
+
   ## make sure it is in GMT
   attr(thedata$date, "tzone") <- "GMT"
-  
+
   # make sure class is correct for lubridate
   class(thedata$date) <- c("POSIXct" , "POSIXt")
-  
+
   thedata
 }
 
@@ -171,9 +171,9 @@ stations <- stations[which(stations$SiteID %in% unique(OPENAIRts$code)),]
 # saveRDS(stations, "stations.rds")
 
 # Clean up OPENAIRts
-pollution <- OPENAIRts[, c("code", "date", 
+pollution <- OPENAIRts[, c("code", "date",
                            "pm10", "pm2.5", "no2", "o3", "so2", "co")]
-names(pollution) <- c("SiteID", "datetime", 
+names(pollution) <- c("SiteID", "datetime",
                       "pm10", "pm2.5", "no2", "o3", "so2", "co")
 pollution$SiteID <- as.character(pollution$SiteID)
 pollution$datetime <- as.character(pollution$datetime)
@@ -185,9 +185,9 @@ rm(importAURN_CV, OPENAIRts)
 # GET CLIMATE DATA (FROM ECMWF ERA-INTERIM) ####################################
 ################################################################################
 
-# Run MARS request to get netcdf files (split by year) for the following weather 
-# variables: 2 metre temperature (t2m), 10 metre wind in u (u10) and v (v10) 
-# direction, total precipitation (tp), boundary layer height (blh) and surface 
+# Run MARS request to get netcdf files (split by year) for the following weather
+# variables: 2 metre temperature (t2m), 10 metre wind in u (u10) and v (v10)
+# direction, total precipitation (tp), boundary layer height (blh) and surface
 # net solar radiation (ssr).
 # This requires to set up the ecmwfapi.
 
@@ -198,9 +198,9 @@ writeLines(c(
   paste('from ecmwfapi import ECMWFDataServer'),
   paste('server = ECMWFDataServer()'),
   paste('for x in range(2003, 2015):'),
-  
+
   paste('    server.retrieve({'),
-  
+
   paste('        "class"     : "ei",'),
   paste('        "dataset"   : "interim",'),
   paste('        "date"      : str(x) + "-01-01/to/" + str(x) + "-12-31",'),
@@ -208,15 +208,15 @@ writeLines(c(
   paste('        "grid"      : "0.75/0.75",'),
   paste('        "levtype"   : "sfc",'),
   paste('        "param"     : "159.128/176.128/228.128/165.128/166.128/167.128",'),
-  paste('        "step"      : "3/6/9/12",'),     
+  paste('        "step"      : "3/6/9/12",'),
   paste('        "stream"    : "oper",'),
   paste('        "time"      : "00:00:00/12:00:00",'),
   paste('        "type"      : "fc",'),
-  
+
   paste('        "format"    : "netcdf",'),
   paste('        "target"    : "climate" + str(x) + ".nc"'),
   paste('    })')
-  
+
 ), fileConn, sep = "\n")
 close(fileConn)
 
@@ -231,31 +231,31 @@ library(parallel)
 years <- 1981:2014
 t2mI <- mclapply(X = years,
                  FUN = pointInspection, mc.cores = length(years),
-                 points = stations, var = "t2m", prefix = "climate",  
+                 points = stations, var = "t2m", prefix = "climate",
                  path = ".", parallel = TRUE)
 t2m <- do.call(rbind.data.frame, t2mI); rm(t2mI)
 
 u10I <- mclapply(X = years,
                  FUN = pointInspection, mc.cores = length(years),
-                 points = stations, var = "u10", prefix = "climate",  
+                 points = stations, var = "u10", prefix = "climate",
                  path = ".", parallel = TRUE)
 u10 <- do.call(rbind.data.frame, u10I); rm(u10I)
 
 v10I <- mclapply(X = years,
                  FUN = pointInspection, mc.cores = length(years),
-                 points = stations, var = "v10", prefix = "climate", 
+                 points = stations, var = "v10", prefix = "climate",
                  path = ".", parallel = TRUE)
 v10 <- do.call(rbind.data.frame, v10I); rm(v10I)
 
 tpI <- mclapply(X = years,
                 FUN = pointInspection, mc.cores = length(years),
-                points = stations, var = "tp", prefix = "climate",  
+                points = stations, var = "tp", prefix = "climate",
                 path = ".", parallel = TRUE)
 tp <- do.call(rbind.data.frame, tpI); rm(tpI)
 
 blhI <- mclapply(X = years,
                  FUN = pointInspection, mc.cores = length(years),
-                 points = stations, var = "blh", prefix = "climate",  
+                 points = stations, var = "blh", prefix = "climate",
                  path = ".", parallel = TRUE)
 blh <- do.call(rbind.data.frame, blhI); rm(blhI)
 
@@ -268,37 +268,37 @@ ssr <- do.call(rbind.data.frame, ssrI); rm(ssrI)
 # Infill missing values (3 hour gap) using linear interpolation
 t2mI <- mclapply(X = unique(t2m$SiteID),
                  FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                 df = t2m, maxgap = 3, 
+                 df = t2m, maxgap = 3,
                  parallel = TRUE, formatDT = "%Y-%m-%d %H:%M")
 t2m <- do.call(rbind.data.frame, t2mI); rm(t2mI)
 
 u10I <- mclapply(X = unique(u10$SiteID),
                  FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                 df = u10, maxgap = 3, 
+                 df = u10, maxgap = 3,
                  parallel = TRUE, formatDT = "%Y-%m-%d %H:%M")
 u10 <- do.call(rbind.data.frame, u10I); rm(u10I)
 
 v10I <- mclapply(X = unique(v10$SiteID),
                  FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                 df = v10, maxgap = 3, 
+                 df = v10, maxgap = 3,
                  parallel = TRUE, formatDT = "%Y-%m-%d %H:%M")
 v10 <- do.call(rbind.data.frame, v10I); rm(v10I)
 
 tpI <- mclapply(X = unique(tp$SiteID),
                 FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                df = tp, maxgap = 3, 
+                df = tp, maxgap = 3,
                 parallel = TRUE, formatDT = "%Y-%m-%d %H:%M")
 tp <- do.call(rbind.data.frame, tpI); rm(tpI)
 
 blhI <- mclapply(X = unique(blh$SiteID),
                  FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                 df = blh, maxgap = 3, 
+                 df = blh, maxgap = 3,
                  parallel = TRUE, formatDT = "%Y-%m-%d %H:%M")
 blh <- do.call(rbind.data.frame, blhI); rm(blhI)
 
 ssrI <- mclapply(X = unique(ssr$SiteID),
                  FUN = fillMissingValues, mc.cores = detectCores() - 1,
-                 df = ssr, maxgap = 3, 
+                 df = ssr, maxgap = 3,
                  parallel = TRUE, formatDT = "%Y-%m-%d %H:%M")
 ssr <- do.call(rbind.data.frame, ssrI); rm(ssrI)
 
@@ -405,7 +405,7 @@ CVDcancer$Over40 <- apply(X = na.omit(CVDcancer[, 16:26]), MARGIN = 1,
                           FUN = sum, na.rm = TRUE)
 CVDcancer$Over60 <- apply(X = na.omit(CVDcancer[, 20:26]), MARGIN = 1,
                           FUN = sum, na.rm = TRUE)
-CVDcancer <- CVDcancer[,c("DateByDay", "Region", 
+CVDcancer <- CVDcancer[,c("DateByDay", "Region",
                           "Over0", "Over20", "Over40", "Over60")]
 
 LiverDiseases$Over0 <- apply(X = na.omit(LiverDiseases[, 7:26]),
@@ -420,10 +420,10 @@ LiverDiseases <- LiverDiseases[,c("DateByDay", "Region",
                                   "Over0", "Over20", "Over40", "Over60")]
 
 # Rename
-names(CVDcancer) <- c("DateByDay", "Region", 
+names(CVDcancer) <- c("DateByDay", "Region",
                       "CVDOver0", "CVDOver20", "CVDOver40", "CVDOver60")
-names(LiverDiseases) <- c("DateByDay", "Region", 
-                          "LiverOver0", "LiverOver20", 
+names(LiverDiseases) <- c("DateByDay", "Region",
+                          "LiverOver0", "LiverOver20",
                           "LiverOver40", "LiverOver60")
 
 # Join
@@ -435,7 +435,7 @@ Health <- Health[, c("DateByDay", "Year", "Region",
 Health[,4:11] <- sapply(Health[,4:11], as.numeric)
 Health$Region <- as.character(Health$Region)
 Health$DateByDay <- as.character(Health$DateByDay)
-Health$Region[Health$Region=="Yorkshire and the Humber"] <- 
+Health$Region[Health$Region=="Yorkshire and the Humber"] <-
   "Yorkshire and The Humber"
 rm(CVDcancer,LiverDiseases)
 
@@ -563,7 +563,7 @@ length(unique(db$SiteID)) # 162
 
 # Range of temporal coverage
 # remove all the rows containing only NAs in pollution features
-ind <- apply(db[, c("pm10", "pm2.5", "no2", "o3", "so2", "co")], 1, 
+ind <- apply(db[, c("pm10", "pm2.5", "no2", "o3", "so2", "co")], 1,
              function(y) all(is.na(y)))
 # Group by site
 grouped <- group_by(db[!ind, ], SiteID)
@@ -572,37 +572,37 @@ summary(x$uniqueYears) # (mean) 12 years
 
 # How many stations measured O3? For how many years?
 length(unique(db$SiteID[!is.na(db$o3)])) # 95 stations
-x <- group_by(db[!is.na(db$o3),], SiteID) %>% 
+x <- group_by(db[!is.na(db$o3),], SiteID) %>%
   summarise(uniqueYears = n_distinct(Year))
 summary(x$uniqueYears) # (mean) 14 years
 
 # How many stations measured CO? For how many years?
 length(unique(db$SiteID[!is.na(db$co)])) # 80 stations
-x <- group_by(db[!is.na(db$co),], SiteID) %>% 
+x <- group_by(db[!is.na(db$co),], SiteID) %>%
   summarise(uniqueYears = n_distinct(Year))
 summary(x$uniqueYears) # (mean) 11 years
 
 # How many stations measured NO2? For how many years?
 length(unique(db$SiteID[!is.na(db$no2)])) # 146 stations
-x <- group_by(db[!is.na(db$no2),], SiteID) %>% 
+x <- group_by(db[!is.na(db$no2),], SiteID) %>%
   summarise(uniqueYears = n_distinct(Year))
 summary(x$uniqueYears) # (mean) 12 years
 
 # How many stations measured SO2? For how many years?
 length(unique(db$SiteID[!is.na(db$so2)])) # 85 stations
-x <- group_by(db[!is.na(db$so2),], SiteID) %>% 
+x <- group_by(db[!is.na(db$so2),], SiteID) %>%
   summarise(uniqueYears = n_distinct(Year))
 summary(x$uniqueYears) # (mean) 12 years
 
 # How many stations measured PM10? For how many years?
 length(unique(db$SiteID[!is.na(db$pm10)])) # 83 stations
-x <- group_by(db[!is.na(db$pm10),], SiteID) %>% 
+x <- group_by(db[!is.na(db$pm10),], SiteID) %>%
   summarise(uniqueYears = n_distinct(Year))
 summary(x$uniqueYears) # (mean) 11 years
 
 # How many stations measured PM2.5? For how many years?
 length(unique(db$SiteID[!is.na(db$pm2.5)])) # 64 stations
-x <- group_by(db[!is.na(db$pm2.5),], SiteID) %>% 
+x <- group_by(db[!is.na(db$pm2.5),], SiteID) %>%
   summarise(uniqueYears = n_distinct(Year))
 summary(x$uniqueYears) # (mean) 6 years
 
@@ -636,16 +636,16 @@ x <- as.data.frame(table(training$Region))
 slicesX <- x$Freq
 lblsX <- x$Var1
 pctX <- round(slicesX/sum(slicesX)*100)
-lblsX <- paste(lblsX, pctX) # add percents to labels 
-lblsX <- paste(lblsX,"%",sep="") # ad % to labels 
+lblsX <- paste(lblsX, pctX) # add percents to labels
+lblsX <- paste(lblsX,"%",sep="") # ad % to labels
 
 # Pie Chart of Types with Percentages
 y <- as.data.frame(table(training$Type))
 slicesY <- y$Freq
 lblsY <- y$Var1
 pctY <- round(slicesY/sum(slicesY)*100)
-lblsY <- paste(lblsY, pctY) # add percents to labels 
-lblsY <- paste(lblsY,"%",sep="") # ad % to labels 
+lblsY <- paste(lblsY, pctY) # add percents to labels
+lblsY <- paste(lblsY,"%",sep="") # ad % to labels
 
 # Default size
 size <- 480 # px
@@ -664,6 +664,8 @@ pie(slicesY,labels = lblsY, col=rainbow(length(lblsY)),
     main="Types")
 dev.off()
 
+# Use imageMagick to merge png images
+# sudo apt-get install imagemagick
 system('convert Regions.png Types.png -background none -append RegTypes.png')
 
 rm(x, y, lblsX, lblsY, pctX, pctY, size, slicesX, slicesY)
@@ -689,10 +691,10 @@ rm(x, y, lblsX, lblsY, pctX, pctY, size, slicesX, slicesY)
 library(bnlearn)
 
 # Load the training set
-# training <- readRDS("training.rds") 
+# training <- readRDS("training.rds")
 
-# Which colums do not contain NAs? colSums(is.na(training)) == 0
-# Start removing NAs from weather variables
+# Which columns do not contain NAs? colSums(is.na(training)) == 0
+# Remove records with NAs in weather variables
 training <- training[-which(is.na(training$ws)),]
 
 ### HYPOTHESIS: ONLY CVD CAUSES ARE RELEVANT ###################################
@@ -706,15 +708,105 @@ training <- training[-which(is.na(training$CVD60)), ]
 training <- droplevels(training[, names(sort(colSums(is.na(training))))])
 # saveRDS(training, "database_BeforeEM_allObsFeatures.rds")
 
-### Define blacklist to apply to future changes of the BN ######################
-library(bnlearn)
-training <- readRDS("/var/data/Modelling/UK/database_BeforeEM_allObsFeatures.rds")
+# Define blacklist
+bl <- data.frame("from" = c(rep("Region",10),
+                            rep("Zone",10),
+                            rep("Type",10),
+                            rep("Year",10),
+                            rep("Season",10),
+                            rep("Month",10),
+                            rep("Day",10),
+                            rep("Hour",10),
+                            rep("Latitude",10),
+                            rep("Longitude",10),
+                            rep("Altitude",10),
+                            rep("CVD60",23),
+                            rep("t2m",11),
+                            rep("ws",11),
+                            rep("wd",11),
+                            rep("tp",11),
+                            rep("blh",11),
+                            rep("ssr",11),
+                            rep("no2",11),
+                            rep("so2",11),
+                            rep("co",11),
+                            rep("o3",11),
+                            rep("pm10",11),
+                            rep("pm2.5",11)),
+                 "to" = c("Zone", "Type", "Year", "Season", "Month", "Day",
+                          "Hour", "Latitude", "Longitude", "Altitude",
+                          "Region", "Type", "Year", "Season", "Month", "Day",
+                          "Hour", "Latitude", "Longitude", "Altitude",
+                          "Region", "Zone", "Year", "Season", "Month", "Day",
+                          "Hour", "Latitude", "Longitude", "Altitude",
+                          "Region", "Zone", "Type", "Season", "Month", "Day",
+                          "Hour", "Latitude", "Longitude", "Altitude",
+                          "Region", "Zone", "Type", "Year", "Month", "Day",
+                          "Hour", "Latitude", "Longitude", "Altitude",
+                          "Region", "Zone", "Type", "Year", "Season", "Day",
+                          "Hour", "Latitude", "Longitude", "Altitude",
+                          "Region", "Zone", "Type", "Year", "Season", "Month",
+                          "Hour", "Latitude", "Longitude", "Altitude",
+                          "Region", "Zone", "Type", "Year", "Season", "Month",
+                          "Day", "Latitude", "Longitude", "Altitude",
+                          "Region", "Zone", "Type", "Year", "Season", "Month",
+                          "Day", "Hour", "Longitude", "Altitude",
+                          "Region", "Zone", "Type", "Year", "Season", "Month",
+                          "Day", "Hour", "Latitude", "Altitude",
+                          "Region", "Zone", "Type", "Year", "Season", "Month",
+                          "Day", "Hour", "Latitude", "Longitude",
+                          "Region","Zone","Type",
+                          "Year","Season","Month","Day","Hour",
+                          "Latitude","Longitude","Altitude",
+                          "t2m","ws","wd","tp","blh","ssr",
+                          "no2","o3","so2","co","pm10","pm2.5",
+                          "Region","Zone","Type",
+                          "Year","Season","Month","Day","Hour",
+                          "Latitude","Longitude","Altitude",
+                          "Region","Zone","Type",
+                          "Year","Season","Month","Day","Hour",
+                          "Latitude","Longitude","Altitude",
+                          "Region","Zone","Type",
+                          "Year","Season","Month","Day","Hour",
+                          "Latitude","Longitude","Altitude",
+                          "Region","Zone","Type",
+                          "Year","Season","Month","Day","Hour",
+                          "Latitude","Longitude","Altitude",
+                          "Region","Zone","Type",
+                          "Year","Season","Month","Day","Hour",
+                          "Latitude","Longitude","Altitude",
+                          "Region","Zone","Type",
+                          "Year","Season","Month","Day","Hour",
+                          "Latitude","Longitude","Altitude",
+                          "Region","Zone","Type",
+                          "Year","Season","Month","Day","Hour",
+                          "Latitude","Longitude","Altitude",
+                          "Region","Zone","Type",
+                          "Year","Season","Month","Day","Hour",
+                          "Latitude","Longitude","Altitude",
+                          "Region","Zone","Type",
+                          "Year","Season","Month","Day","Hour",
+                          "Latitude","Longitude","Altitude",
+                          "Region","Zone","Type",
+                          "Year","Season","Month","Day","Hour",
+                          "Latitude","Longitude","Altitude",
+                          "Region","Zone","Type",
+                          "Year","Season","Month","Day","Hour",
+                          "Latitude","Longitude","Altitude",
+                          "Region","Zone","Type",
+                          "Year","Season","Month","Day","Hour",
+                          "Latitude","Longitude","Altitude"))
 
-# Imputing Missing Data With Expectation – Maximization
-# initialise using the empty graph and complete observations.
+### CORE SIMULATION ############################################################
+library(bnlearn)
+training <- readRDS("database_BeforeEM_allObsFeatures.rds")
+
+# Complete observations
 rowsCompleteObservations <- which(complete.cases(training))
 completeObservations <- training[rowsCompleteObservations, ]
 
+# Imputing Missing Data With Expectation – Maximization
+# initialise using the empty graph and complete observations
 dag <- empty.graph(names(completeObservations))
 bnTarget <- bn.fit(dag, completeObservations)          # node.ordering(bnTarget)
 
@@ -723,13 +815,13 @@ which.missing <- names(which(sapply(training, function(x) anyNA(x))))
 
 loopNumber <- 1
 
-repeat{
-  
+# repeat{
+
   print(paste("Loop n.", loopNumber, sep = ""))
-  
+
   # E: replacing all missing values with their (E)xpectation.
   current <- training
-  
+
   # Discard columns with zero or near-zero variance
   col2remove <- c()
   for (nCol in names(which(sapply(current, class) == 'factor'))){
@@ -737,152 +829,61 @@ repeat{
     levelsCol <- names(which( eval(parse(text = stringCol)) != 0 ))
     if (!all(unique(current[,nCol]) %in% levelsCol)) {
       # if (length(levelsCol) <= 1) {
-      col2remove <- c(col2remove, nCol) 
+      col2remove <- c(col2remove, nCol)
     }
   }
   col2remove <- which(names(current) %in% col2remove)
-  # names(current)[col2remove] # "Region" "Zone"   "Type"   "Year"
+  # names(current)[col2remove]               # "Region" "Zone"   "Type"   "Year"
   # unique(current$Region[rowsCompleteObservations])
   # unique(current$Zone[rowsCompleteObservations])
   # unique(current$Type[rowsCompleteObservations])
   # unique(current$Year[rowsCompleteObservations])
-  
   current <- current[, -col2remove]
-  
+
   # iterate over all the variables with missing data
-  for (myVar in which.missing) {                     # myVar <- which.missing[1]
-    
+  for (myVar in which.missing) {
+
     print(myVar)
-    
+
     # variables that do no have any missing value for the observations/variable
     # combination we are imputing in this iteration.
     complete.variables <- which(sapply(current[is.na(current[, myVar]),
                                                ], function(x) !anyNA(x)))
     complete.predictors <- current[is.na(current[, myVar]),
                                    complete.variables, drop = FALSE]
-    
+
     current[is.na(current[, myVar]), myVar] <-
-      predict(object = bnTarget, 
-              node = myVar, 
-              data = complete.predictors, 
+      predict(object = bnTarget,
+              node = myVar,
+              data = complete.predictors,
               method = "bayes-lw")
-    
+
   }
-  
+
+  # saveRDS(current, "current.rds")
+  # rm(complete.predictors)
+
   # M: learning the model that (M)aximises the score with the current data,
   # after we have imputed all the missing data in all the variables.
-  completeObservations <- current[complete.cases(current),]
-  
-  # Define blacklist
-  bl <- data.frame("from" = c(rep("Region",10),
-                              rep("Zone",10),
-                              rep("Type",10),
-                              rep("Year",10),
-                              rep("Season",10),
-                              rep("Month",10),
-                              rep("Day",10),
-                              rep("Hour",10),
-                              rep("Latitude",10),
-                              rep("Longitude",10),
-                              rep("Altitude",10),
-                              rep("CVD60",23),
-                              rep("t2m",11),
-                              rep("ws",11),
-                              rep("wd",11),
-                              rep("tp",11),
-                              rep("blh",11),
-                              rep("ssr",11),
-                              rep("no2",11),
-                              rep("so2",11),
-                              rep("co",11),
-                              rep("o3",11),
-                              rep("pm10",11),
-                              rep("pm2.5",11)),
-                   "to" = c("Zone", "Type", "Year", "Season", "Month", "Day", 
-                            "Hour", "Latitude", "Longitude", "Altitude",
-                            "Region", "Type", "Year", "Season", "Month", "Day",
-                            "Hour", "Latitude", "Longitude", "Altitude",
-                            "Region", "Zone", "Year", "Season", "Month", "Day", 
-                            "Hour", "Latitude", "Longitude", "Altitude",
-                            "Region", "Zone", "Type", "Season", "Month", "Day", 
-                            "Hour", "Latitude", "Longitude", "Altitude",
-                            "Region", "Zone", "Type", "Year", "Month", "Day", 
-                            "Hour", "Latitude", "Longitude", "Altitude",
-                            "Region", "Zone", "Type", "Year", "Season", "Day", 
-                            "Hour", "Latitude", "Longitude", "Altitude",
-                            "Region", "Zone", "Type", "Year", "Season", "Month", 
-                            "Hour", "Latitude", "Longitude", "Altitude",
-                            "Region", "Zone", "Type", "Year", "Season", "Month", 
-                            "Day", "Latitude", "Longitude", "Altitude",
-                            "Region", "Zone", "Type", "Year", "Season", "Month", 
-                            "Day", "Hour", "Longitude", "Altitude",
-                            "Region", "Zone", "Type", "Year", "Season", "Month", 
-                            "Day", "Hour", "Latitude", "Altitude",
-                            "Region", "Zone", "Type", "Year", "Season", "Month", 
-                            "Day", "Hour", "Latitude", "Longitude",
-                            "Region","Zone","Type",
-                            "Year","Season","Month","Day","Hour",
-                            "Latitude","Longitude","Altitude",
-                            "t2m","ws","wd","tp","blh","ssr",
-                            "no2","o3","so2","co","pm10","pm2.5",
-                            "Region","Zone","Type",
-                            "Year","Season","Month","Day","Hour",
-                            "Latitude","Longitude","Altitude",
-                            "Region","Zone","Type",
-                            "Year","Season","Month","Day","Hour",
-                            "Latitude","Longitude","Altitude",
-                            "Region","Zone","Type",
-                            "Year","Season","Month","Day","Hour",
-                            "Latitude","Longitude","Altitude",
-                            "Region","Zone","Type",
-                            "Year","Season","Month","Day","Hour",
-                            "Latitude","Longitude","Altitude",
-                            "Region","Zone","Type",
-                            "Year","Season","Month","Day","Hour",
-                            "Latitude","Longitude","Altitude",
-                            "Region","Zone","Type",
-                            "Year","Season","Month","Day","Hour",
-                            "Latitude","Longitude","Altitude",
-                            "Region","Zone","Type",
-                            "Year","Season","Month","Day","Hour",
-                            "Latitude","Longitude","Altitude",
-                            "Region","Zone","Type",
-                            "Year","Season","Month","Day","Hour",
-                            "Latitude","Longitude","Altitude",
-                            "Region","Zone","Type",
-                            "Year","Season","Month","Day","Hour",
-                            "Latitude","Longitude","Altitude",
-                            "Region","Zone","Type",
-                            "Year","Season","Month","Day","Hour",
-                            "Latitude","Longitude","Altitude",
-                            "Region","Zone","Type",
-                            "Year","Season","Month","Day","Hour",
-                            "Latitude","Longitude","Altitude",
-                            "Region","Zone","Type",
-                            "Year","Season","Month","Day","Hour",
-                            "Latitude","Longitude","Altitude"))
-  
-  bl <- bl[!(bl$from %in% names(training)[col2remove] | 
-               bl$to %in% names(training)[col2remove]),]
-  
-  dagNew <- hc(completeObservations, blacklist = bl) # , debug = TRUE
-  graphviz.plot(dagNew)
-  
-  bnCurrent <- bn.fit(dag, completeObservations) # , debug = TRUE
-  
-  test <- compare(target = bnTarget, current = bnCurrent, arcs = TRUE)
-  
-  if(test$tp - dim()){
-    
-    break
-    
-  }else{
-    
-    dag1 <- dag2
-    
-  }
-  
-}
+  imputedTraining <- cbind(training[, 1:18],
+                           current[, which.missing])
+  completeObservations <- imputedTraining[complete.cases(imputedTraining),]
+  # rm(imputedTraining); gc()
 
-graphviz.plot(dag, highlight = NULL, layout = "dot",
-              shape = "circle", main = NULL, sub = NULL)
+  # bl <- bl[!(bl$from %in% names(training)[col2remove] |
+  #              bl$to %in% names(training)[col2remove]),]
+
+  # library(profvis)
+  # profvis({
+  dagNew <- hc(completeObservations, blacklist = bl, debug = TRUE)
+  # })
+  # graphviz.plot(dagNew)
+  # saveRDS(dagNew, "dagNew.rds")
+
+  bnCurrent <- bn.fit(dag, completeObservations) # , debug = TRUE
+
+  # TODO: Setup a test to compare convergence
+  # test <- compare(target = bnTarget, current = bnCurrent, arcs = TRUE)
+  # if (test...)
+
+#}
