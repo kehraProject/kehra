@@ -78,51 +78,51 @@ rm(stationsSP, x, reg, regions)
 # exceeding max number of open connections
 importAURN_CV <- function(site = "my1", year = 2009,
                           pollutant = "all", hc = FALSE) {
-
+  
   site <- toupper(site)
-
+  
   files <- lapply(site, function (x) paste(x, "_", year, sep = ""))
-
+  
   files <- do.call(c, files)
-
-
+  
+  
   loadData <- function(x) {
     tryCatch({
       fileName <- paste("http://uk-air.defra.gov.uk/openair/R_data/",
                         x, ".RData", sep = "")
       con <- url(fileName, method = "libcurl")
       load(con)
-
+      
       closeAllConnections()
-
+      
       dat <- get(x)
-
+      
       return(dat)
     },
     error = function(ex) {cat(x, "does not exist - ignoring that one.\n")})
-
+    
   }
-
-
+  
+  
   thedata <- plyr::ldply(files, loadData)
-
+  
   if (nrow(thedata) == 0) return() ## no data
-
+  
   ## suppress warnings for now - unequal factors, harmless
-
+  
   if (is.null(thedata)) stop("No data to import - check site codes and year.",
                              call. = FALSE)
-
+  
   thedata$site <- factor(thedata$site, levels = unique(thedata$site))
-
+  
   ## change names
   names(thedata) <- tolower(names(thedata))
-
+  
   ## change nox as no2
   id <- which(names(thedata) %in% "noxasno2")
   if (length(id) == 1) names(thedata)[id] <- "nox"
-
-
+  
+  
   ## should hydrocarbons be imported?
   if (hc) {
     thedata <- thedata
@@ -131,15 +131,15 @@ importAURN_CV <- function(site = "my1", year = 2009,
     theNames <- c("date",
                   "co", "nox", "no2", "no", "o3", "so2", "pm10", "pm2.5",
                   "v10", "v2.5", "nv10", "nv2.5", "ws", "wd", "code", "site")
-
+    
     thedata <- thedata[,  which(names(thedata) %in% theNames)]
   }
-
+  
   ## if particular pollutants have been selected
   if (pollutant != "all") thedata <- thedata[, c("date", pollutant,
                                                  "site", "code")]
-
-
+  
+  
   ## warning about recent, possibly unratified data
   timeDiff <- difftime(Sys.time(),  max(thedata$date), units='days')
   if (timeDiff < 180) {
@@ -151,13 +151,13 @@ importAURN_CV <- function(site = "my1", year = 2009,
                   paste("http://www.airquality.co.uk/data_and_statistics.php?",
                         "action=da_1&go=Go", sep = ""))
   }
-
+  
   ## make sure it is in GMT
   attr(thedata$date, "tzone") <- "GMT"
-
+  
   # make sure class is correct for lubridate
   class(thedata$date) <- c("POSIXct" , "POSIXt")
-
+  
   thedata
 }
 
@@ -198,9 +198,9 @@ writeLines(c(
   paste('from ecmwfapi import ECMWFDataServer'),
   paste('server = ECMWFDataServer()'),
   paste('for x in range(2003, 2015):'),
-
+  
   paste('    server.retrieve({'),
-
+  
   paste('        "class"     : "ei",'),
   paste('        "dataset"   : "interim",'),
   paste('        "date"      : str(x) + "-01-01/to/" + str(x) + "-12-31",'),
@@ -212,11 +212,11 @@ writeLines(c(
   paste('        "stream"    : "oper",'),
   paste('        "time"      : "00:00:00/12:00:00",'),
   paste('        "type"      : "fc",'),
-
+  
   paste('        "format"    : "netcdf",'),
   paste('        "target"    : "climate" + str(x) + ".nc"'),
   paste('    })')
-
+  
 ), fileConn, sep = "\n")
 close(fileConn)
 
@@ -708,6 +708,12 @@ training <- training[-which(is.na(training$CVD60)), ]
 training <- droplevels(training[, names(sort(colSums(is.na(training))))])
 # saveRDS(training, "database_BeforeEM_allObsFeatures.rds")
 
+### CORE SIMULATION ############################################################
+# install.packages("~/bnlearn_4.1-20160803.tar.gz", repos = NULL, type = "source")
+library(bnlearn)
+
+training <- readRDS("/var/data/Modelling/UK/database_BeforeEM_allObsFeatures.rds")
+
 # Define blacklist
 bl <- data.frame("from" = c(rep("Region",10),
                             rep("Zone",10),
@@ -797,10 +803,6 @@ bl <- data.frame("from" = c(rep("Region",10),
                           "Year","Season","Month","Day","Hour",
                           "Latitude","Longitude","Altitude"))
 
-### CORE SIMULATION ############################################################
-library(bnlearn)
-training <- readRDS("database_BeforeEM_allObsFeatures.rds")
-
 # Complete observations
 rowsCompleteObservations <- which(complete.cases(training))
 completeObservations <- training[rowsCompleteObservations, ]
@@ -810,80 +812,118 @@ completeObservations <- training[rowsCompleteObservations, ]
 dag <- empty.graph(names(completeObservations))
 bnTarget <- bn.fit(dag, completeObservations)          # node.ordering(bnTarget)
 
+saveRDS(object = dag, file = "~/currentDAG_loop0.rds")
+saveRDS(object = bnTarget, file = "~/currentModel_loop0.rds")
+
 # which variables have missing values?
 which.missing <- names(which(sapply(training, function(x) anyNA(x))))
+
+library(parallel)
+# Calculate the number of cores and initiate cluster
+cl <- makeCluster(detectCores() - 1, outfile="")
+invisible(clusterEvalQ(cl, library(bnlearn)))
 
 loopNumber <- 1
 
 # repeat{
 
-  print(paste("Loop n.", loopNumber, sep = ""))
+# E: replacing all missing values with their (E)xpectation.
+current <- training
 
-  # E: replacing all missing values with their (E)xpectation.
-  current <- training
-
-  # Discard columns with zero or near-zero variance
-  col2remove <- c()
-  for (nCol in names(which(sapply(current, class) == 'factor'))){
-    stringCol <- paste("bnTarget$", nCol, "$prob", sep = "")
-    levelsCol <- names(which( eval(parse(text = stringCol)) != 0 ))
-    if (!all(unique(current[,nCol]) %in% levelsCol)) {
-      # if (length(levelsCol) <= 1) {
-      col2remove <- c(col2remove, nCol)
-    }
+# Discard columns with zero or near-zero variance
+col2remove <- c()
+for (nCol in names(which(sapply(current, class) == 'factor'))){
+  stringCol <- paste("bnTarget$", nCol, "$prob", sep = "")
+  levelsCol <- names(which( eval(parse(text = stringCol)) != 0 ))
+  if (!all(unique(current[,nCol]) %in% levelsCol)) {
+    col2remove <- c(col2remove, nCol)
   }
-  col2remove <- which(names(current) %in% col2remove)
-  # names(current)[col2remove]               # "Region" "Zone"   "Type"   "Year"
-  # unique(current$Region[rowsCompleteObservations])
-  # unique(current$Zone[rowsCompleteObservations])
-  # unique(current$Type[rowsCompleteObservations])
-  # unique(current$Year[rowsCompleteObservations])
-  current <- current[, -col2remove]
+}
+col2remove <- which(names(current) %in% col2remove)
+current <- current[, -col2remove]
 
-  # iterate over all the variables with missing data
-  for (myVar in which.missing) {
-
-    print(myVar)
-
-    # variables that do no have any missing value for the observations/variable
-    # combination we are imputing in this iteration.
-    complete.variables <- which(sapply(current[is.na(current[, myVar]),
-                                               ], function(x) !anyNA(x)))
-    complete.predictors <- current[is.na(current[, myVar]),
-                                   complete.variables, drop = FALSE]
-
-    current[is.na(current[, myVar]), myVar] <-
-      predict(object = bnTarget,
-              node = myVar,
-              data = complete.predictors,
-              method = "bayes-lw")
-
+# iterate over all the variables with missing data.
+res <- parSapply(cl, which.missing, function(myVar, current, bnTarget, n) {
+  
+  # variables that do no have any missing value for the observations/variable
+  # combination we are imputing in this iteration.
+  missing.to.predict = is.na(current[, myVar])
+  complete.predictors = sapply(current, function(x) !any(is.na(x) & missing.to.predict))
+  complete.predictors = names(which(complete.predictors))
+  
+  if (length(nbr(bnTarget, myVar)) == 0) {
+    
+    # if the node has no neighbours, there is no information to propagate
+    # from other variables: just simulate from the marginal distribution
+    # using a reduced standard deviation to match that from predict().
+    rnorm(length(which(missing.to.predict)), mean = bnTarget[[myVar]]$coef,
+          sd = bnTarget[[myVar]]$sd / sqrt(n))
+    
   }
+  else {
+    
+    predict(object = bnTarget,
+            node = myVar,
+            data = current[missing.to.predict, complete.predictors],
+            method = "bayes-lw", n = n)
+    
+  }
+  
+}, current = current, bnTarget = bnTarget, n = 50, simplify = FALSE)
 
-  # saveRDS(current, "current.rds")
-  # rm(complete.predictors)
+for (myVar in which.missing)
+  current[is.na(current[, myVar]), myVar] = res[[myVar]]
 
-  # M: learning the model that (M)aximises the score with the current data,
-  # after we have imputed all the missing data in all the variables.
-  imputedTraining <- cbind(training[, 1:18],
-                           current[, which.missing])
-  completeObservations <- imputedTraining[complete.cases(imputedTraining),]
-  # rm(imputedTraining); gc()
+# ensure we garbage-collect what we have used until this point, as we will
+# not use it again.
+invisible(clusterEvalQ(cl, gc()))
 
-  # bl <- bl[!(bl$from %in% names(training)[col2remove] |
-  #              bl$to %in% names(training)[col2remove]),]
+# M: learning the model that (M)aximises the score with the current data,
+# after we have imputed all the missing data in all the variables.
+imputedTraining <- data.frame(training[, 1:18, drop = FALSE],
+                              current[, which.missing, drop = FALSE])
 
-  # library(profvis)
-  # profvis({
-  dagNew <- hc(completeObservations, blacklist = bl, debug = TRUE)
-  # })
-  # graphviz.plot(dagNew)
-  # saveRDS(dagNew, "dagNew.rds")
+# split the data and learn a collection of networks.
+set.seed(loopNumber)
+splitted <- split(sample(nrow(imputedTraining)), seq(length(cl)))
+# how many records are discarded? dim(training)[1] - 63*length(splitted[[1]])
 
-  bnCurrent <- bn.fit(dag, completeObservations) # , debug = TRUE
+models <- parLapply(cl, splitted, function(samples, data, bl, dag) {
+  
+  hc(data[samples, , drop = FALSE], blacklist = bl, start = dag)
+  
+}, data = imputedTraining, bl = bl, dag = dag) 
 
-  # TODO: Setup a test to compare convergence
-  # test <- compare(target = bnTarget, current = bnCurrent, arcs = TRUE)
-  # if (test...)
+# average the networks (and make sure the result is completely directed).
+dagNew <- averaged.network(custom.strength(models, nodes = names(imputedTraining)))
+dagNew <- cextend(dagNew)
 
-#}
+# ensure we garbage-collect what we have used until this point, as we will
+# not use it again.
+invisible(clusterEvalQ(cl, gc()))
+
+# learn the parameters of the averaged network.
+bnCurrent <- bn.fit(dagNew, imputedTraining, cluster = cl)
+
+# Save dag and fitted bn at each iteration
+saveRDS(object = dagNew, 
+        file = paste("~/currentDAG_loop", loopNumber,".rds", sep = ""))
+
+saveRDS(object = bnCurrent, 
+        file = paste("~/currentModel_loop", loopNumber,".rds", sep = ""))
+
+if (all.equal(dagNew, dag)) {
+  
+  break
+  
+}
+else {
+  
+  dag = dagNew
+  bnTarget = bnCurrent
+  
+}
+
+# }
+
+stopCluster(cl)
