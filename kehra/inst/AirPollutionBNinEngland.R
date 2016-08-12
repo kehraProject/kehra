@@ -823,107 +823,105 @@ library(parallel)
 cl <- makeCluster(detectCores() - 1, outfile="")
 invisible(clusterEvalQ(cl, library(bnlearn)))
 
-loopNumber <- 1
-
-# repeat{
-
-# E: replacing all missing values with their (E)xpectation.
-current <- training
-
-# Discard columns with zero or near-zero variance
-col2remove <- c()
-for (nCol in names(which(sapply(current, class) == 'factor'))){
-  stringCol <- paste("bnTarget$", nCol, "$prob", sep = "")
-  levelsCol <- names(which( eval(parse(text = stringCol)) != 0 ))
-  if (!all(unique(current[,nCol]) %in% levelsCol)) {
-    col2remove <- c(col2remove, nCol)
+for(loopNumber in 1:5){
+  
+  print(paste("Loop n.", loopNumber, sep = ""))
+  
+  # E: replacing all missing values with their (E)xpectation.
+  current <- training
+  
+  # Discard columns with zero or near-zero variance
+  col2remove <- c()
+  for (nCol in names(which(sapply(current, class) == 'factor'))){
+    stringCol <- paste("bnTarget$", nCol, "$prob", sep = "")
+    levelsCol <- names(which( eval(parse(text = stringCol)) != 0 ))
+    if (!all(unique(current[,nCol]) %in% levelsCol)) {
+      col2remove <- c(col2remove, nCol)
+    }
   }
-}
-col2remove <- which(names(current) %in% col2remove)
-current <- current[, -col2remove]
-
-# iterate over all the variables with missing data.
-res <- parSapply(cl, which.missing, function(myVar, current, bnTarget, n) {
+  col2remove <- which(names(current) %in% col2remove)
+  current <- current[, -col2remove]
   
-  # variables that do no have any missing value for the observations/variable
-  # combination we are imputing in this iteration.
-  missing.to.predict = is.na(current[, myVar])
-  complete.predictors = sapply(current, function(x) !any(is.na(x) & missing.to.predict))
-  complete.predictors = names(which(complete.predictors))
-  
-  if (length(nbr(bnTarget, myVar)) == 0) {
+  # iterate over all the variables with missing data.
+  res <- parSapply(cl, which.missing, function(myVar, current, bnTarget, n) {
     
-    # if the node has no neighbours, there is no information to propagate
-    # from other variables: just simulate from the marginal distribution
-    # using a reduced standard deviation to match that from predict().
-    rnorm(length(which(missing.to.predict)), mean = bnTarget[[myVar]]$coef,
-          sd = bnTarget[[myVar]]$sd / sqrt(n))
+    # variables that do no have any missing value for the observations/variable
+    # combination we are imputing in this iteration.
+    missing.to.predict = is.na(current[, myVar])
+    complete.predictors = sapply(current, function(x) !any(is.na(x) & missing.to.predict))
+    complete.predictors = names(which(complete.predictors))
+    
+    if (length(nbr(bnTarget, myVar)) == 0) {
+      
+      # if the node has no neighbours, there is no information to propagate
+      # from other variables: just simulate from the marginal distribution
+      # using a reduced standard deviation to match that from predict().
+      rnorm(length(which(missing.to.predict)), mean = bnTarget[[myVar]]$coef,
+            sd = bnTarget[[myVar]]$sd / sqrt(n))
+      
+    }
+    else {
+      
+      predict(object = bnTarget,
+              node = myVar,
+              data = current[missing.to.predict, complete.predictors],
+              method = "bayes-lw", n = n)
+      
+    }
+    
+  }, current = current, bnTarget = bnTarget, n = 50, simplify = FALSE)
+  
+  for (myVar in which.missing)
+    current[is.na(current[, myVar]), myVar] = res[[myVar]]
+  
+  # ensure we garbage-collect what we have used until this point, as we will
+  # not use it again.
+  invisible(clusterEvalQ(cl, gc()))
+  
+  # M: learning the model that (M)aximises the score with the current data,
+  # after we have imputed all the missing data in all the variables.
+  imputedTraining <- data.frame(training[, 1:18, drop = FALSE],
+                                current[, which.missing, drop = FALSE])
+  
+  # split the data and learn a collection of networks.
+  set.seed(loopNumber)
+  splitted <- split(sample(nrow(imputedTraining)), seq(length(cl)))
+  # how many records are discarded? dim(training)[1] - 63*length(splitted[[1]])
+  
+  models <- parLapply(cl, splitted, function(samples, data, bl, dag) {
+    
+    hc(data[samples, , drop = FALSE], blacklist = bl, start = dag)
+    
+  }, data = imputedTraining, bl = bl, dag = dag) 
+  
+  # average the networks (and make sure the result is completely directed).
+  dagNew <- averaged.network(custom.strength(models, nodes = names(imputedTraining)))
+  dagNew <- cextend(dagNew)
+  
+  # ensure we garbage-collect what we have used until this point, as we will
+  # not use it again.
+  invisible(clusterEvalQ(cl, gc()))
+  
+  # learn the parameters of the averaged network.
+  bnCurrent <- bn.fit(dagNew, imputedTraining, cluster = cl)
+  
+  # Save dag and fitted bn at each iteration
+  saveRDS(object = dagNew, 
+          file = paste("~/currentDAG_loop", loopNumber,".rds", sep = ""))
+  saveRDS(object = bnCurrent, 
+          file = paste("~/currentModel_loop", loopNumber,".rds", sep = ""))
+  
+  if (all.equal(dagNew, dag) == TRUE) {
+    
+    break
+    
+  }else{
+    
+    dag = dagNew
+    bnTarget = bnCurrent
     
   }
-  else {
-    
-    predict(object = bnTarget,
-            node = myVar,
-            data = current[missing.to.predict, complete.predictors],
-            method = "bayes-lw", n = n)
-    
-  }
-  
-}, current = current, bnTarget = bnTarget, n = 50, simplify = FALSE)
-
-for (myVar in which.missing)
-  current[is.na(current[, myVar]), myVar] = res[[myVar]]
-
-# ensure we garbage-collect what we have used until this point, as we will
-# not use it again.
-invisible(clusterEvalQ(cl, gc()))
-
-# M: learning the model that (M)aximises the score with the current data,
-# after we have imputed all the missing data in all the variables.
-imputedTraining <- data.frame(training[, 1:18, drop = FALSE],
-                              current[, which.missing, drop = FALSE])
-
-# split the data and learn a collection of networks.
-set.seed(loopNumber)
-splitted <- split(sample(nrow(imputedTraining)), seq(length(cl)))
-# how many records are discarded? dim(training)[1] - 63*length(splitted[[1]])
-
-models <- parLapply(cl, splitted, function(samples, data, bl, dag) {
-  
-  hc(data[samples, , drop = FALSE], blacklist = bl, start = dag)
-  
-}, data = imputedTraining, bl = bl, dag = dag) 
-
-# average the networks (and make sure the result is completely directed).
-dagNew <- averaged.network(custom.strength(models, nodes = names(imputedTraining)))
-dagNew <- cextend(dagNew)
-
-# ensure we garbage-collect what we have used until this point, as we will
-# not use it again.
-invisible(clusterEvalQ(cl, gc()))
-
-# learn the parameters of the averaged network.
-bnCurrent <- bn.fit(dagNew, imputedTraining, cluster = cl)
-
-# Save dag and fitted bn at each iteration
-saveRDS(object = dagNew, 
-        file = paste("~/currentDAG_loop", loopNumber,".rds", sep = ""))
-
-saveRDS(object = bnCurrent, 
-        file = paste("~/currentModel_loop", loopNumber,".rds", sep = ""))
-
-if (all.equal(dagNew, dag)) {
-  
-  break
   
 }
-else {
-  
-  dag = dagNew
-  bnTarget = bnCurrent
-  
-}
-
-# }
 
 stopCluster(cl)
