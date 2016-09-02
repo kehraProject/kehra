@@ -711,6 +711,7 @@ training <- droplevels(training[, names(sort(colSums(is.na(training))))])
 ### CORE SIMULATION ############################################################
 # install.packages("~/bnlearn_4.1-20160803.tar.gz", repos = NULL, type = "source")
 library(bnlearn)
+library(parallel)
 
 training <- readRDS("/var/data/Modelling/UK/database_BeforeEM_allObsFeatures.rds")
 
@@ -812,18 +813,13 @@ completeObservations <- training[rowsCompleteObservations, ]
 dag <- empty.graph(names(completeObservations))
 bnTarget <- bn.fit(dag, completeObservations)          # node.ordering(bnTarget)
 
-saveRDS(object = dag, file = "~/currentDAG_loop0.rds")
-saveRDS(object = bnTarget, file = "~/currentModel_loop0.rds")
-
 # which variables have missing values?
 which.missing <- names(which(sapply(training, function(x) anyNA(x))))
 
-library(parallel)
-# Calculate the number of cores and initiate cluster
-cl <- makeCluster(detectCores() - 1, outfile="")
+cl = makeCluster(detectCores() - 1)
 invisible(clusterEvalQ(cl, library(bnlearn)))
 
-for(loopNumber in 1:5){
+for(loopNumber in 1:10){
   
   print(paste("Loop n.", loopNumber, sep = ""))
   
@@ -884,19 +880,21 @@ for(loopNumber in 1:5){
                                 current[, which.missing, drop = FALSE])
   
   # split the data and learn a collection of networks.
-  set.seed(loopNumber)
   splitted <- split(sample(nrow(imputedTraining)), seq(length(cl)))
-  # how many records are discarded? dim(training)[1] - 63*length(splitted[[1]])
   
   models <- parLapply(cl, splitted, function(samples, data, bl, dag) {
     
     hc(data[samples, , drop = FALSE], blacklist = bl, start = dag)
     
-  }, data = imputedTraining, bl = bl, dag = dag) 
+  }, data = imputedTraining, bl = bl, dag = dag)
   
   # average the networks (and make sure the result is completely directed).
   dagNew <- averaged.network(custom.strength(models, nodes = names(imputedTraining)))
   dagNew <- cextend(dagNew)
+  
+  # Save models at each iteration
+  saveRDS(object = dagNew,
+          file = paste("~/currentDAG_loop", loopNumber,".rds", sep = ""))
   
   # ensure we garbage-collect what we have used until this point, as we will
   # not use it again.
@@ -905,23 +903,29 @@ for(loopNumber in 1:5){
   # learn the parameters of the averaged network.
   bnCurrent <- bn.fit(dagNew, imputedTraining, cluster = cl)
   
-  # Save dag and fitted bn at each iteration
-  saveRDS(object = dagNew, 
-          file = paste("~/currentDAG_loop", loopNumber,".rds", sep = ""))
-  saveRDS(object = bnCurrent, 
+  # Save fitted bn at each iteration
+  saveRDS(object = bnCurrent,
           file = paste("~/currentModel_loop", loopNumber,".rds", sep = ""))
   
-  if (all.equal(dagNew, dag) == TRUE) {
-    
-    break
-    
-  }else{
-    
-    dag = dagNew
-    bnTarget = bnCurrent
-    
-  }
+  print("dagNew == dag?")
+  all.equal(dagNew, dag)
+  
+  # if (all.equal(dagNew, dag)) {
+  #
+  #   break
+  #
+  # }
+  # else {
+  #
+  #   dag = dagNew
+  #   bnTarget = bnCurrent
+  #
+  # }
+  
+  dag = dagNew
+  bnTarget = bnCurrent
   
 }
 
 stopCluster(cl)
+
