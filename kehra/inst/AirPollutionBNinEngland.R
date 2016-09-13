@@ -713,7 +713,7 @@ training <- droplevels(training[, names(sort(colSums(is.na(training))))])
 library(bnlearn)
 library(parallel)
 
-training <- readRDS("/var/data/Modelling/UK/database_BeforeEM_allObsFeatures.rds")
+training<-readRDS("/var/data/Modelling/UK/database_BeforeEM_allObsFeatures.rds")
 
 # Define blacklist
 bl <- data.frame("from" = c(rep("Region",10),
@@ -816,14 +816,15 @@ bnTarget <- bn.fit(dag, completeObservations)          # node.ordering(bnTarget)
 # which variables have missing values?
 which.missing <- names(which(sapply(training, function(x) anyNA(x))))
 
-cl = makeCluster(detectCores() - 1)
-invisible(clusterEvalQ(cl, library(bnlearn)))
-
 for(loopNumber in 1:10){
 
-  print(paste("Loop n.", loopNumber, sep = ""))
+  print(paste("********* Loop n.", loopNumber, sep = ""))
 
-  # E: replacing all missing values with their (E)xpectation.
+  print(paste("Setting up a cluster using", detectCores() - 1, "cores"))
+  cl <- makeCluster(getOption("cl.cores", detectCores() - 1))
+  invisible(clusterEvalQ(cl, library(bnlearn)))
+
+  print("E: replacing all missing values with their (E)xpectation.")
   current <- training
 
   # Discard columns with zero or near-zero variance
@@ -838,14 +839,16 @@ for(loopNumber in 1:10){
   col2remove <- which(names(current) %in% col2remove)
   current <- current[, -col2remove]
 
-  # iterate over all the variables with missing data.
+  print("iterate over all the variables with missing data.")
   res <- parSapply(cl, which.missing, function(myVar, current, bnTarget, n) {
 
     # variables that do no have any missing value for the observations/variable
     # combination we are imputing in this iteration.
-    missing.to.predict = is.na(current[, myVar])
-    complete.predictors = sapply(current, function(x) !any(is.na(x) & missing.to.predict))
-    complete.predictors = names(which(complete.predictors))
+    missing.to.predict <- is.na(current[, myVar])
+    complete.predictors <- sapply(current,
+                                  function(x) !any(is.na(x) &
+                                                     missing.to.predict))
+    complete.predictors <- names(which(complete.predictors))
 
     if (length(nbr(bnTarget, myVar)) == 0) {
 
@@ -874,12 +877,13 @@ for(loopNumber in 1:10){
   # not use it again.
   invisible(clusterEvalQ(cl, gc()))
 
+  print("M: learning the model that (M)aximises the score with the current data")
   # M: learning the model that (M)aximises the score with the current data,
   # after we have imputed all the missing data in all the variables.
   imputedTraining <- data.frame(training[, 1:18, drop = FALSE],
                                 current[, which.missing, drop = FALSE])
 
-  # split the data and learn a collection of networks.
+  print("split the data and learn a collection of networks.")
   splitted <- split(sample(nrow(imputedTraining)), seq(length(cl)))
 
   models <- parLapply(cl, splitted, function(samples, data, bl, dag) {
@@ -888,7 +892,7 @@ for(loopNumber in 1:10){
 
   }, data = imputedTraining, bl = bl, dag = dag)
 
-  # average the networks (and make sure the result is completely directed).
+  print("average the networks (and make sure the result is completely directed).")
   dagNew <- averaged.network(custom.strength(models, nodes = names(imputedTraining)))
   dagNew <- cextend(dagNew)
 
@@ -900,28 +904,18 @@ for(loopNumber in 1:10){
   # not use it again.
   invisible(clusterEvalQ(cl, gc()))
 
-  # learn the parameters of the averaged network.
+  print("learn the parameters of the averaged network.")
   bnCurrent <- bn.fit(dagNew, imputedTraining, cluster = cl)
 
   # Save fitted bn at each iteration
   saveRDS(object = bnCurrent,
           file = paste("~/currentModel_loop", loopNumber,".rds", sep = ""))
 
-  # if (all.equal(dagNew, dag)) { # Removed because if not TRUE causes error!!!
-  #
-  #   break
-  #
-  # }
-  # else {
-  #
-  #   dag = dagNew
-  #   bnTarget = bnCurrent
-  #
-  # }
+  # Prepare for next iteration
+  dag <- dagNew
+  bnTarget <- bnCurrent
 
-  dag = dagNew
-  bnTarget = bnCurrent
+  print("Stopping the cluster")
+  stopCluster(cl)
 
 }
-
-stopCluster(cl)
