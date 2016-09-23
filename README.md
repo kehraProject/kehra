@@ -1,44 +1,53 @@
+
+<!-- Edit the README.Rmd only!!! The README.md is generated automatically from README.Rmd. -->
 kehra: an R package to collect, assemble and model air pollution, weather and health data
-=======
+=========================================================================================
 
-[![DOI](https://zenodo.org/badge/9118/cvitolo/r_kehra.svg)](https://zenodo.org/badge/55284/9118/cvitolo/r_kehra)
-[![CRAN Status Badge](http://www.r-pkg.org/badges/version/kehra)](http://cran.r-project.org/web/packages/kehra)
-[![CRAN Total Downloads](http://cranlogs.r-pkg.org/badges/grand-total/kehra)](http://cran.rstudio.com/web/packages/kehra/index.html)
-[![CRAN Monthly Downloads](http://cranlogs.r-pkg.org/badges/kehra)](http://cran.rstudio.com/web/packages/kehra/index.html)
+[![DOI](https://zenodo.org/badge/59011710.svg)](https://zenodo.org/badge/latestdoi/59011710)
 
-Collect, assemble and model air pollution, weather and health data is a Big Data problem. Here are some utility functions developed as part of the British Council's funded KEHRA project.
+[![Travis-CI Build Status](https://travis-ci.org/kehraProject/kehra.svg?branch=master)](https://travis-ci.org/kehraProject/kehra) [![Coverage Status](https://img.shields.io/codecov/c/github/kehraProject/kehra/master.svg)](https://codecov.io/github/kehraProject/kehra?branch=master)
 
-**To cite this software:** 
+[![CRAN Status Badge](http://www.r-pkg.org/badges/version/kehra)](http://cran.r-project.org/web/packages/kehra) [![CRAN Total Downloads](http://cranlogs.r-pkg.org/badges/grand-total/kehra)](http://cran.rstudio.com/web/packages/kehra/index.html) [![CRAN Monthly Downloads](http://cranlogs.r-pkg.org/badges/kehra)](http://cran.rstudio.com/web/packages/kehra/index.html)
 
-Vitolo C., Tucker A. and Russell A. (2016). kehra: Collect, assemble and model air pollution, weather and health data. R package version 0.1.  https://CRAN.R-project.org/package=kehra. DOI: http://dx.doi.org/10.5281/zenodo.55284
+The package [kehra](https://cran.r-project.org/package=kehra) allows to collect, assemble and model air pollution, weather and health data. The package is being developed as part of the British Council's funded KEHRA project and builds upon other R packages such as [rdefra](https://cran.r-project.org/package=rdefra) to retrieve pollution data from the UK-AIR database hosted by the UK Department for Enviornment, Food and Rural Affairs, and the [bnlearn](https://cran.r-project.org/package=bnlearn) to model the assembled database using Bayesian Networks.
 
-# Dependencies
-The kehra package is dependent on a number of CRAN packages. Install them first:
+Dependencies
+------------
 
-```R
-install.packages(c("Hmisc", "raster", "reshape2", "stringr", "sp", "xts", "zoo"))
-library(devtools)
+The kehra package depends on the Geospatial Data Abstraction Library (gdal) and some additional CRAN packages. Check for missing dependencies and install them using the commands below:
+
+``` r
+packs <- c('Hmisc', 'raster', 'reshape2', 'stringr', 'sp', 'xts', 'zoo', 
+           'devtools', 'rgdal')
+new.packages <- packs[!(packs %in% installed.packages()[,'Package'])]
+if(length(new.packages)) install.packages(new.packages)
 ```
 
+Installation
+------------
 
-# Installation
-The stable version of the **kehra** package is available from CRAN:
+Get the released version from CRAN:
 
-```R
-install.packages("kehra")
+``` r
+install.packages('kehra')
 ```
 
-This github repository contains the development version (latest version but potentially unstable), which can be installed via devtools:
+Or the development version from github using [devtools](https://github.com/hadley/devtools):
 
-```R
-install_github("cvitolo/r_kehra", subdir = "kehra")
+``` r
+devtools::install_github('kehraProject/kehra')
 ```
 
-Now, load the kehra package:
+Load the kehra package:
 
-```R
-library(kehra)
+``` r
+library('kehra')
 ```
 
-# Leave your feedback
-I would greatly appreciate if you could leave your feedbacks via email (cvitolodev@gmail.com).
+Meta
+----
+
+-   Please note that this project is released with a [Contributor Code of Conduct](CONDUCT.md). By participating in this project you agree to abide by its terms.
+-   Please [report any issues or bugs](https://github.com/kehraProject/kehra/issues).
+-   License: [GPL-3](https://opensource.org/licenses/GPL-3.0)
+-   Get citation information for `kehra` in R doing `citation(package = 'kehra')`

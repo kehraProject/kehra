@@ -19,6 +19,12 @@ knitr::opts_chunk$set(
 )
 ```
 
+[![DOI](https://zenodo.org/badge/59011710.svg)](https://zenodo.org/badge/latestdoi/59011710)
+
+[![Travis-CI Build Status](https://travis-ci.org/kehraProject/kehra.svg?branch=master)](https://travis-ci.org/kehraProject/kehra)
+[![AppVeyor Build Status](https://ci.appveyor.com/api/projects/status/github/kehraProject/kehra?branch=master&svg=true)](https://ci.appveyor.com/project/kehraProject/kehra)
+[![Coverage Status](https://img.shields.io/codecov/c/github/kehraProject/kehra/master.svg)](https://codecov.io/github/kehraProject/kehra?branch=master)
+
 [![CRAN Status Badge](http://www.r-pkg.org/badges/version/kehra)](http://cran.r-project.org/web/packages/kehra)
 [![CRAN Total Downloads](http://cranlogs.r-pkg.org/badges/grand-total/kehra)](http://cran.rstudio.com/web/packages/kehra/index.html)
 [![CRAN Monthly Downloads](http://cranlogs.r-pkg.org/badges/kehra)](http://cran.rstudio.com/web/packages/kehra/index.html)

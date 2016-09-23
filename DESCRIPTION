@@ -13,3 +13,4 @@ Imports: Hmisc, raster, reshape2, stringr, sp, xts, zoo
 License: GPL-3
 Repository: CRAN
 RoxygenNote: 5.0.1
+Suggests: covr

@@ -5,3 +5,5 @@
 README.Rmd
 README.md
 README_cache
+^\.travis\.yml$
+^appveyor\.yml$
