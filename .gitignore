@@ -24,3 +24,6 @@ r_kehra.Rproj
 data/*
 images/*
 *.tar.gz
+
+README_cache
+kehra.Rproj

@@ -1,0 +1,15 @@
+Package: kehra
+Type: Package
+Title: Collect, Assemble and Model Air Pollution, Weather and Health Data
+Version: 0.3
+Date: 2016-06-09
+Author: Claudia Vitolo [aut, cre], Allan Tucker [aut], Andrew Russell [aut]
+Maintainer: Claudia Vitolo <cvitolodev@gmail.com>
+URL: https://github.com/kehraProject/r_kehra
+BugReports: https://github.com/kehraProject/r_kehra/issues
+Description: Collection of utility functions used in the KEHRA project (see http://www.brunel.ac.uk/ife/britishcouncil). It refers to the multidimensional analysis of air pollution, weather and health data.
+Depends: R (>= 2.14.0)
+Imports: Hmisc, raster, reshape2, stringr, sp, xts, zoo
+License: GPL-3
+Repository: CRAN
+RoxygenNote: 5.0.1

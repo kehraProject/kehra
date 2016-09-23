@@ -1,0 +1,64 @@
+---
+output: 
+  github_document
+---
+
+<!-- Edit the README.Rmd only!!! The README.md is generated automatically from README.Rmd. -->
+
+kehra: an R package to collect, assemble and model air pollution, weather and health data
+==============================================================
+
+```{r echo=FALSE}
+knitr::opts_chunk$set(
+  comment = '#>',
+  collapse = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  eval = FALSE,
+  cache = TRUE
+)
+```
+
+[![CRAN Status Badge](http://www.r-pkg.org/badges/version/kehra)](http://cran.r-project.org/web/packages/kehra)
+[![CRAN Total Downloads](http://cranlogs.r-pkg.org/badges/grand-total/kehra)](http://cran.rstudio.com/web/packages/kehra/index.html)
+[![CRAN Monthly Downloads](http://cranlogs.r-pkg.org/badges/kehra)](http://cran.rstudio.com/web/packages/kehra/index.html)
+
+The package [kehra](https://cran.r-project.org/package=kehra) allows to collect, assemble and model air pollution, weather and health data. The package is being developed as part of the British Council's funded KEHRA project and builds upon other R packages such as [rdefra](https://cran.r-project.org/package=rdefra) to retrieve pollution data from the UK-AIR database hosted by the UK Department for Enviornment, Food and Rural Affairs, and the [bnlearn](https://cran.r-project.org/package=bnlearn) to model the assembled database using Bayesian Networks.
+
+## Dependencies
+
+The kehra package depends on the Geospatial Data Abstraction Library (gdal) and some additional CRAN packages. Check for missing dependencies and install them using the commands below:
+
+```{r}
+packs <- c('Hmisc', 'raster', 'reshape2', 'stringr', 'sp', 'xts', 'zoo', 
+           'devtools', 'rgdal')
+new.packages <- packs[!(packs %in% installed.packages()[,'Package'])]
+if(length(new.packages)) install.packages(new.packages)
+```
+
+## Installation
+
+Get the released version from CRAN:
+
+```{r}
+install.packages('kehra')
+```
+
+Or the development version from github using [devtools](https://github.com/hadley/devtools):
+
+```{r}
+devtools::install_github('kehraProject/kehra')
+```
+
+Load the kehra package:
+
+```{r, eval = TRUE}
+library('kehra')
+```
+
+## Meta
+
+* Please note that this project is released with a [Contributor Code of Conduct](CONDUCT.md). By participating in this project you agree to abide by its terms.
+* Please [report any issues or bugs](https://github.com/kehraProject/kehra/issues).
+* License: [GPL-3](https://opensource.org/licenses/GPL-3.0)
+* Get citation information for `kehra` in R doing `citation(package = 'kehra')`
