@@ -709,7 +709,8 @@ training <- droplevels(training[, names(sort(colSums(is.na(training))))])
 # saveRDS(training, "database_BeforeEM_allObsFeatures.rds")
 
 ### CORE SIMULATION ############################################################
-# install.packages("~/bnlearn_4.1-20160803.tar.gz",repos = NULL,type = "source")
+# install.packages("bnlearn_4.1-20160803.tar.gz", repos = NULL, type = "source")
+
 library(bnlearn)
 library(parallel)
 
@@ -810,24 +811,29 @@ completeObservations <- training[rowsCompleteObservations, ]
 
 # Imputing Missing Data With Expectation – Maximization
 # initialise using the empty graph and complete observations
-dag <- empty.graph(names(completeObservations))
-bnTarget <- bn.fit(dag, completeObservations)          # node.ordering(bnTarget)
+# dag <- empty.graph(names(completeObservations))
+# bnTarget <- bn.fit(dag, completeObservations)        # node.ordering(bnTarget)
+loopNumber <- 1
+dag <- readRDS(paste("~/currentDAG_loop", loopNumber,".rds", sep = ""))
+bnTarget <- readRDS(paste("~/currentModel_loop", loopNumber,".rds", sep = ""))
 
 # which variables have missing values?
 which.missing <- names(which(sapply(training, function(x) anyNA(x))))
+
+# print(paste("Setting up a cluster using", detectCores() - 1, "cores"))
+# cl <- makeCluster(getOption("cl.cores", detectCores() - 1))
+print("Setting up a cluster")
+cl <- makeCluster(getOption("cl.cores", 15))
+invisible(clusterEvalQ(cl, library(bnlearn)))
 
 for(loopNumber in 1:10){
 
   print(paste("********* Loop n.", loopNumber, sep = ""))
 
-  print(paste("Setting up a cluster using", detectCores() - 1, "cores"))
-  cl <- makeCluster(getOption("cl.cores", detectCores() - 1))
-  invisible(clusterEvalQ(cl, library(bnlearn)))
-
   print("E: replacing all missing values with their (E)xpectation.")
   current <- training
 
-  # Discard columns with zero or near-zero variance
+  print("Discard columns with zero or near-zero variance")
   col2remove <- c()
   for (nCol in names(which(sapply(current, class) == 'factor'))){
     stringCol <- paste("bnTarget$", nCol, "$prob", sep = "")
@@ -837,7 +843,7 @@ for(loopNumber in 1:10){
     }
   }
   col2remove <- which(names(current) %in% col2remove)
-  current <- current[, -col2remove]
+  if (length(col2remove) >= 1) current <- current[, -col2remove]
 
   print("iterate over all the variables with missing data.")
   res <- parSapply(cl, which.missing, function(myVar, current, bnTarget, n) {
@@ -873,13 +879,13 @@ for(loopNumber in 1:10){
   for (myVar in which.missing)
     current[is.na(current[, myVar]), myVar] = res[[myVar]]
 
-  # ensure we garbage-collect what we have used until this point, as we will
-  # not use it again.
+  print(paste("ensure we garbage-collect what we have used until this point,",
+              "as we will not use it again."))
   invisible(clusterEvalQ(cl, gc()))
 
-  print("M: learning the model that (M)aximises the score with the current data")
-  # M: learning the model that (M)aximises the score with the current data,
-  # after we have imputed all the missing data in all the variables.
+  print(paste("M: learning the model that (M)aximises the score with the",
+              "current data, after we have imputed all the missing data in all",
+              "the variables."))
   imputedTraining <- data.frame(training[, 1:18, drop = FALSE],
                                 current[, which.missing, drop = FALSE])
 
@@ -892,30 +898,137 @@ for(loopNumber in 1:10){
 
   }, data = imputedTraining, bl = bl, dag = dag)
 
-  print("average the networks (and make sure the result is completely directed).")
-  dagNew <- averaged.network(custom.strength(models, nodes = names(imputedTraining)))
+  print("average the networks and make sure the result is completely directed.")
+  dagNew <- averaged.network(custom.strength(models,
+                                             nodes = names(imputedTraining)))
   dagNew <- cextend(dagNew)
 
-  # Save models at each iteration
+  print("Save the model at each iteration")
   saveRDS(object = dagNew,
           file = paste("~/currentDAG_loop", loopNumber,".rds", sep = ""))
 
-  # ensure we garbage-collect what we have used until this point, as we will
-  # not use it again.
+  print(paste("ensure we garbage-collect what we have used until this point,",
+              "as we will not use it again."))
   invisible(clusterEvalQ(cl, gc()))
 
   print("learn the parameters of the averaged network.")
   bnCurrent <- bn.fit(dagNew, imputedTraining, cluster = cl)
 
-  # Save fitted bn at each iteration
+  print("Save fitted bn at each iteration")
   saveRDS(object = bnCurrent,
           file = paste("~/currentModel_loop", loopNumber,".rds", sep = ""))
 
-  # Prepare for next iteration
+  print("Prepare for next iteration")
   dag <- dagNew
   bnTarget <- bnCurrent
 
-  print("Stopping the cluster")
-  stopCluster(cl)
+  rm(dagNew, bnCurrent)
 
 }
+
+print("Stopping the cluster")
+stopCluster(cl)
+
+# COMPARE DAGS AND CHECK FOR CONVERGENCE #######################################
+
+library(bnlearn)
+
+dag1 <- readRDS("/home/claudia/Dropbox/Repos/r_kehra/currentDAG_loop1.rds")
+dag2 <- readRDS("/home/claudia/Dropbox/Repos/r_kehra/currentDAG_loop2.rds")
+all.equal(dag1,dag2)
+compare(dag1,dag2, arcs = TRUE)
+
+dag3 <- readRDS("/home/claudia/Dropbox/Repos/r_kehra/currentDAG_loop3.rds")
+all.equal(dag2,dag3)
+
+dag4 <- readRDS("/home/claudia/Dropbox/Repos/r_kehra/currentDAG_loop4.rds")
+all.equal(dag3,dag4)
+
+dag5 <- readRDS("/home/claudia/Dropbox/Repos/r_kehra/currentDAG_loop5.rds")
+all.equal(dag4,dag5)
+compare(dag4,dag5, arcs = TRUE)
+
+dag6 <- readRDS("/home/claudia/Dropbox/Repos/r_kehra/currentDAG_loop6.rds")
+all.equal(dag5,dag6)
+compare(dag5,dag6, arcs = TRUE)
+
+dag7 <- readRDS("/home/claudia/Dropbox/Repos/r_kehra/currentDAG_loop7.rds")
+all.equal(dag6,dag7)
+compare(dag6,dag7, arcs = TRUE)
+
+dag8 <- readRDS("/home/claudia/Dropbox/Repos/r_kehra/currentDAG_loop8.rds")
+all.equal(dag7,dag8)
+compare(dag7,dag8, arcs = TRUE)
+
+# THERE IS NO ABSOLUTE CONVERGENCE ... WE TAKE THE LATEST NETWORK!
+dag <- dag8
+rm(dag1, dag2, dag3, dag4, dag5, dag6, dag7)
+
+# PLOT NETWORK #################################################################
+# (work in progress!)
+
+source("https://bioconductor.org/biocLite.R")
+biocLite("Rgraphviz")
+
+library(graph)
+library(Rgraphviz)
+
+nodes <- names(dag8$nodes)
+arcs <- dag8$arcs
+layout <- "dot"
+attrs <- list(node = list(fixedsize="FALSE", fillcolor=""),
+              edge=list(color="grey"),
+              graph=list(rankdir="LR"))
+
+graph.obj = new("graphNEL",
+                nodes = nodes,
+                edgeL = bnlearn:::arcs2elist(arcs, nodes),
+                edgemode = "directed")
+
+svg(filename="BN_SVG.svg",
+    width=10,
+    height=10,
+    pointsize=1)
+plot(graph.obj, attrs = attrs)
+dev.off()
+
+# Generate sub-graphs
+bn8 <- readRDS("currentModel_loop8.rds")
+
+bn8$CVD60$parents # "Region" "Year"   "Season" "Month"
+bn8$Region$parents
+bn8$Year$parents
+bn8$Season$parents
+bn8$Month$parents
+
+subgraphCV <- function(dag, node){
+
+  nAttrs <- list(color = c(eval(parse(text = paste0(node, "=", "'red'")))),
+                 fontcolor = c(eval(parse(text = paste0(node, "=", "'red'")))))
+  plot(subGraph(c(node,
+                  eval(parse(text = paste0("bn8$", node, "$parents"))),
+                  eval(parse(text = paste0("bn8$", node, "$children"))),
+                  graph.obj)), nodeAttrs=nAttrs)
+
+}
+
+nAttrs <- list(color = c("CVD60" = "red"), fontcolor = c("CVD60" = "red"))
+plot(subGraph(c("CVD60", bn8$CVD60$parents), graph.obj), nodeAttrs=nAttrs)
+
+plot(subGraph(c("Region", bn8$Region$children), graph.obj))
+plot(subGraph(c("Year", bn8$Year$children), graph.obj))
+plot(subGraph(c("Month", bn8$Month$children), graph.obj))
+#plot(subGraph(c("Season", bn8$Season$children), graph.obj))
+plot(subGraph(c("blh", bn8$blh$children), graph.obj))
+
+nAttrs <- list(color = c("no2" = "red"), fontcolor = c("no2" = "red"))
+plot(subGraph(c("no2", bn8$no2$parents, bn8$no2$children), graph.obj), nodeAttrs=nAttrs)
+plot(subGraph(c("o3", bn8$o3$parents, bn8$o3$children), graph.obj), nodeAttrs=nAttrs)
+
+hlight <- list(nodes = nodes(dag8), arcs = arcs(dag8),
+               col = "grey", textCol = "grey")
+
+pp <- graphviz.plot(dag8, highlight = hlight, layout = "dot",
+                    shape = "circle", main = NULL, sub = NULL)
+
+edgeRenderInfo(pp) <- list(col = c())
