@@ -1003,16 +1003,16 @@ bn8$Year$parents
 bn8$Season$parents
 bn8$Month$parents
 
-subgraphCV <- function(dag, node){
-
-  nAttrs <- list(color = c(eval(parse(text = paste0(node, "=", "'red'")))),
-                 fontcolor = c(eval(parse(text = paste0(node, "=", "'red'")))))
-  plot(subGraph(c(node,
-                  eval(parse(text = paste0("bn8$", node, "$parents"))),
-                  eval(parse(text = paste0("bn8$", node, "$children"))),
-                  graph.obj)), nodeAttrs=nAttrs)
-
-}
+# subgraphCV <- function(dag, node){
+#
+#   nAttrs <- list(color = c(eval(parse(text = paste0(node, "=", "'red'")))),
+#                  fontcolor = c(eval(parse(text = paste0(node, "=", "'red'")))))
+#   plot(subGraph(c(node,
+#                   eval(parse(text = paste0("bn8$", node, "$parents"))),
+#                   eval(parse(text = paste0("bn8$", node, "$children"))),
+#                   graph.obj)), nodeAttrs=nAttrs)
+#
+# }
 
 nAttrs <- list(color = c("CVD60" = "red"), fontcolor = c("CVD60" = "red"))
 plot(subGraph(c("CVD60", bn8$CVD60$parents), graph.obj), nodeAttrs=nAttrs)
