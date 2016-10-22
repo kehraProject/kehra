@@ -995,7 +995,7 @@ plot(graph.obj, attrs = attrs)
 dev.off()
 
 # Generate sub-graphs
-bn8 <- readRDS("currentModel_loop8.rds")
+bn8 <- readRDS("/var/data/Modelling/UK/BN/currentModel_loop8.rds")
 
 bn8$CVD60$parents # "Region" "Year"   "Season" "Month"
 bn8$Region$parents
