@@ -905,7 +905,7 @@ for(loopNumber in 1:10){
 
   print("Save the model at each iteration")
   saveRDS(object = dagNew,
-          file = paste("~/currentDAG_loop", loopNumber,".rds", sep = ""))
+          file = paste("/var/data/Modelling/UK/BN/currentDAG_loop", loopNumber,".rds", sep = ""))
 
   print(paste("ensure we garbage-collect what we have used until this point,",
               "as we will not use it again."))
@@ -916,7 +916,7 @@ for(loopNumber in 1:10){
 
   print("Save fitted bn at each iteration")
   saveRDS(object = bnCurrent,
-          file = paste("~/currentModel_loop", loopNumber,".rds", sep = ""))
+          file = paste("/var/data/Modelling/UK/BN/currentModel_loop", loopNumber,".rds", sep = ""))
 
   print("Prepare for next iteration")
   dag <- dagNew
@@ -933,30 +933,30 @@ stopCluster(cl)
 
 library(bnlearn)
 
-dag1 <- readRDS("/home/claudia/Dropbox/Repos/r_kehra/currentDAG_loop1.rds")
-dag2 <- readRDS("/home/claudia/Dropbox/Repos/r_kehra/currentDAG_loop2.rds")
+dag1 <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop1.rds")
+dag2 <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop2.rds")
 all.equal(dag1,dag2)
 compare(dag1,dag2, arcs = TRUE)
 
-dag3 <- readRDS("/home/claudia/Dropbox/Repos/r_kehra/currentDAG_loop3.rds")
+dag3 <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop3.rds")
 all.equal(dag2,dag3)
 
-dag4 <- readRDS("/home/claudia/Dropbox/Repos/r_kehra/currentDAG_loop4.rds")
+dag4 <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop4.rds")
 all.equal(dag3,dag4)
 
-dag5 <- readRDS("/home/claudia/Dropbox/Repos/r_kehra/currentDAG_loop5.rds")
+dag5 <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop5.rds")
 all.equal(dag4,dag5)
 compare(dag4,dag5, arcs = TRUE)
 
-dag6 <- readRDS("/home/claudia/Dropbox/Repos/r_kehra/currentDAG_loop6.rds")
+dag6 <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop6.rds")
 all.equal(dag5,dag6)
 compare(dag5,dag6, arcs = TRUE)
 
-dag7 <- readRDS("/home/claudia/Dropbox/Repos/r_kehra/currentDAG_loop7.rds")
+dag7 <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop7.rds")
 all.equal(dag6,dag7)
 compare(dag6,dag7, arcs = TRUE)
 
-dag8 <- readRDS("/home/claudia/Dropbox/Repos/r_kehra/currentDAG_loop8.rds")
+dag8 <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop8.rds")
 all.equal(dag7,dag8)
 compare(dag7,dag8, arcs = TRUE)
 
@@ -967,14 +967,16 @@ rm(dag1, dag2, dag3, dag4, dag5, dag6, dag7)
 # PLOT NETWORK #################################################################
 # (work in progress!)
 
+dag <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop8.rds")
+
 source("https://bioconductor.org/biocLite.R")
 biocLite("Rgraphviz")
 
 library(graph)
 library(Rgraphviz)
 
-nodes <- names(dag8$nodes)
-arcs <- dag8$arcs
+nodes <- names(dag$nodes)
+arcs <- dag$arcs
 layout <- "dot"
 attrs <- list(node = list(fixedsize="FALSE", fillcolor=""),
               edge=list(color="grey"),
@@ -1025,10 +1027,10 @@ nAttrs <- list(color = c("no2" = "red"), fontcolor = c("no2" = "red"))
 plot(subGraph(c("no2", bn8$no2$parents, bn8$no2$children), graph.obj), nodeAttrs=nAttrs)
 plot(subGraph(c("o3", bn8$o3$parents, bn8$o3$children), graph.obj), nodeAttrs=nAttrs)
 
-hlight <- list(nodes = nodes(dag8), arcs = arcs(dag8),
+hlight <- list(nodes = nodes(dag), arcs = arcs(dag),
                col = "grey", textCol = "grey")
 
-pp <- graphviz.plot(dag8, highlight = hlight, layout = "dot",
+pp <- graphviz.plot(dag, highlight = hlight, layout = "dot",
                     shape = "circle", main = NULL, sub = NULL)
 
 edgeRenderInfo(pp) <- list(col = c())
