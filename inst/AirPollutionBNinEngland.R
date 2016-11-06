@@ -6,22 +6,17 @@
 # Last updated: June 2016                                                      #
 ################################################################################
 
-# Create data folder in the home folder and set it as working directory
-system("mkdir ~/data")
-setwd("~/data")
-
 # Check for missing dependencies and install them
 # packs <- c("devtools", "plyr", "dplyr", "raster", "sp", "rgdal", "xts", "zoo",
 #            "parallel", "openair", "ncdf4", "gdata", "reshape2", "ggmap")
 # new.packages <- packs[!(packs %in% installed.packages()[,"Package"])]
 # if(length(new.packages)) install.packages(new.packages)
 # rm(new.packages, packs)
-library(devtools)
 
-# Install/load RDEFRA and KEHRA packages
-# install_github("cvitolo/r_rdefra", subdir="rdefra")
+# Install/load RDEFRA and KEHRA packages dev version
+# devtools::install_github("ropenscilabs/rdefra")
 library(rdefra)
-# install_github("cvitolo/r_kehra", subdir="kehra")
+# devtools::install_github("kehraProject/kehra")
 library(kehra)
 
 ################################################################################
@@ -29,8 +24,8 @@ library(kehra)
 ################################################################################
 
 # Get spatial regions and station metadata using the rdefra package
-data(regions)
-data(stations)
+load("/var/data/GEO/regions.rda")
+data("stations")
 
 # Add empty column to stations to store Region name
 stations$Region <- NA
@@ -224,6 +219,7 @@ system(paste('python', py_path))
 rm(fileConn, py_path)
 
 # extract data from ERA INTERIM netcdf files
+setwd("/var/data/Climate/Climate3H/")
 library(ncdf4)
 library(xts)
 library(parallel)
@@ -321,7 +317,7 @@ climate <- left_join(climate, tp, by=c("datetime", "SiteID"))
 climate <- left_join(climate, blh, by=c("datetime", "SiteID"))
 climate <- left_join(climate, ssr, by=c("datetime", "SiteID"))
 
-# saveRDS(climate, "climate.rds")
+# saveRDS(climate, "/var/data/Modelling/UK/climate.rds")
 rm(wsI, wdI, years, u10, v10, blh, t2m, tp, wind, ssr); gc()
 
 ################################################################################
@@ -331,67 +327,30 @@ rm(wsI, wdI, years, u10, v10, blh, t2m, tp, wind, ssr); gc()
 # Health data in the UK is available from the Office for National Statistics
 # The data used for this work was purchased under the KEHRA BC-grant.
 
-library(gdata)
+setwd("/var/data/Health/UK/ONS_purchasedData/")
 
-# Period 1981-1983
-Deaths <- read.xls("ONS_purchasedData/1981to1983.xls",
-                   sheet = "Table 1", header = TRUE, skip=7)
-# Create the first batch of data
-CVDcancer <- Deaths[Deaths$Cause == "CVD and Cancer",]
-LiverDiseases <- Deaths[Deaths$Cause == "Liver Diseases",]
+library("dplyr")
+library("XLConnect")
+Deaths <- as.data.frame(matrix(NA, nrow = 0, ncol = 26))
 
-# Period 1984-1987
-Deaths <- read.xls("ONS_purchasedData/1984to1987.xls",
-                   sheet = "Table 1", header = TRUE, skip=7)
-# Append new data
-CVDcancer <- rbind(CVDcancer, Deaths[Deaths$Cause == "CVD and Cancer",])
-LiverDiseases <- rbind(LiverDiseases, Deaths[Deaths$Cause == "Liver Diseases",])
+for (myfile in list.files(path = ".")){
+  
+  print(myfile)
+  
+  wb <- loadWorkbook(myfile)
+  ws <- readWorksheet(wb, sheet = "Table 1", header = TRUE,
+                      startRow = 8, startCol = 1, endCol = 26)
+  Deaths <- rbind(Deaths, ws)
+  
+}
 
-# Period 1988-1992
-Deaths <- read.xls("ONS_purchasedData/1988to1992.xls",
-                   sheet = "Table 1", header = TRUE, skip=7)
-# Append new data
-CVDcancer <- rbind(CVDcancer, Deaths[Deaths$Cause == "CVD and Cancer",])
-LiverDiseases <- rbind(LiverDiseases, Deaths[Deaths$Cause == "Liver Diseases",])
+# Separate data by causes
+CVDcancer <- Deaths[tolower(Deaths$Cause) == "cvd and cancer",]
+LiverDiseases <- Deaths[tolower(Deaths$Cause) == "liver diseases",]
 
-# Period 1993-1995
-Deaths <- read.xls("ONS_purchasedData/1993to1995.xls",
-                   sheet = "Table 1", header = TRUE, skip=7)
-# Append new data
-CVDcancer <- rbind(CVDcancer, Deaths[Deaths$Cause == "CVD and Cancer",])
-LiverDiseases <- rbind(LiverDiseases, Deaths[Deaths$Cause == "Liver Diseases",])
+rm(Deaths, wb, ws, myfile)
 
-# Period 1996-2000
-Deaths <- read.xls("ONS_purchasedData/1996to2000.xls",
-                   sheet = "Table 1", header = TRUE, skip=7)
-# Append new data
-CVDcancer <- rbind(CVDcancer, Deaths[Deaths$Cause == "CVD and Cancer",])
-LiverDiseases <- rbind(LiverDiseases, Deaths[Deaths$Cause == "Liver Diseases",])
-
-# Period 2001-2005
-Deaths <- read.xls("ONS_purchasedData/2001to2005.xls",
-                   sheet = "Table 1", header = TRUE, skip=7)
-# Append new data
-CVDcancer <- rbind(CVDcancer, Deaths[Deaths$Cause == "CVD and Cancer",])
-LiverDiseases <- rbind(LiverDiseases, Deaths[Deaths$Cause == "Liver Diseases",])
-
-# Period 2006-2010
-Deaths <- read.xls("ONS_purchasedData/2006to2010.xls",
-                   sheet = "Table 1", header = TRUE, skip=7)
-# Append new data
-CVDcancer <- rbind(CVDcancer, Deaths[Deaths$Cause == "CVD and Cancer",])
-LiverDiseases <- rbind(LiverDiseases, Deaths[Deaths$Cause == "Liver Diseases",])
-
-# Period 2011-2014
-Deaths <- read.xls("ONS_purchasedData/20112014.xls",
-                   sheet = "Table 1", header = TRUE, skip=7)
-# Append new data
-CVDcancer <- rbind(CVDcancer, Deaths[Deaths$Cause == "CVD and Cancer",])
-LiverDiseases <- rbind(LiverDiseases, Deaths[Deaths$Cause == "Liver Diseases",])
-
-rm(Deaths)
-
-# Aggregate Deaths for age groups
+# Aggregate Deaths by age groups
 CVDcancer$DateByDay <- as.Date(paste(CVDcancer$Year,
                                      CVDcancer$Month, CVDcancer$Day, sep="-"))
 LiverDiseases$DateByDay <- as.Date(paste(LiverDiseases$Year,
@@ -443,11 +402,12 @@ rm(CVDcancer,LiverDiseases)
 # Downloaded from:
 # http://web.ons.gov.uk/ons/data/dataset-finder/-/q/dcDetails/Social/MYEDE?p_p_lifecycle=1&_FOFlow1_WAR_FOFlow1portlet_dataset_navigation=datasetCollectionDetails
 
-library(reshape2)
-populationEstimates <- readRDS("PopulationEstimatesRegions1971_2014.rds")
+library("reshape2")
+populationEstimates <- readRDS("/var/data/GEO/PopulationEstimatesUK/PopulationEstimatesRegions1971_2014.rds")
 populationEstimates[,1:2] <- sapply(populationEstimates[,1:2], as.character)
 populationEstimates[,3:46] <- sapply(populationEstimates[,3:46], as.numeric)
-populationEstimates <- melt(data = populationEstimates[, 2:46])
+populationEstimates <- melt(data = populationEstimates[, 2:46], 
+                            id.vars = "Geographic.Area")
 names(populationEstimates) <- c("Region", "Year", "YearlyPopEst")
 populationEstimates$Year <- substr(populationEstimates$Year, 5,8)
 populationEstimates$Region <- as.character(populationEstimates$Region)
@@ -466,12 +426,11 @@ HealthSocio <- Health %>%
 
 # Fix inconsistency with name of regions
 HealthSocio$Region[HealthSocio$Region=="London"] <- "Greater London Authority"
-# CHECK: unique(stations$Region) %in% HealthSocio$Region
 HealthSocio <- HealthSocio[, c("DateByDay", "Region", "Year",
                                "CVD00", "CVD20", "CVD40", "CVD60",
                                "LIV00", "LIV20", "LIV40", "LIV60")]
 
-# saveRDS(HealthSocio, "HealthSocio.rds")
+# saveRDS(HealthSocio, "/var/data/Health/UK/HealthSocio.rds")
 rm(Health, populationEstimates); gc()
 
 ################################################################################
@@ -479,10 +438,11 @@ rm(Health, populationEstimates); gc()
 ################################################################################
 
 library(dplyr)
+library(kehra)
 
 # Load pollution data and join with climate data
-# climate <- readRDS("climate.rds")
-# pollution <- readRDS("pollution.rds")
+# climate <- readRDS("/var/data/Modelling/UK/climate.rds")
+# pollution <- readRDS("/var/data/Pollution/AirPollutionUK/pollution.rds")
 # Join pollution and climate data
 exposure <- full_join(climate, pollution, by=c("datetime", "SiteID"))
 rm(climate, pollution); gc()
@@ -495,14 +455,17 @@ exposure$Month     <- as.character(format(datetime, "%m"))
 exposure$Day       <- as.character(format(datetime, "%d"))
 exposure$Hour      <- as.character(format(datetime, "%H"))
 exposure$Season    <- as.character(getSeason(as.Date(exposure$DateByDay)))
-# saveRDS(exposure, "exposure.rds")
+rm(datetime)
+# saveRDS(exposure, "/var/data/Modelling/UK/exposure.rds")
+# exposure <- readRDS("/var/data/Modelling/UK/exposure.rds")
 
 # Join with stations to get the region/zone/type of monitoring
-# stations <- readRDS("stations.rds")
+# stations <- readRDS("/var/data/Pollution/AirPollutionUK/stations.rds")
 expStation <- exposure %>% left_join(stations, by = "SiteID")
 
 # Join exposure and healthsocio
-# HealthSocio <- readRDS("HealthSocio.rds")
+# HealthSocio <- readRDS("/var/data/Health/UK/HealthSocio.rds")
+# CHECK: unique(stations$Region) %in% HealthSocio$Region
 df <- expStation %>% left_join(HealthSocio,
                                by = c("DateByDay", "Region", "Year"))
 
@@ -529,8 +492,12 @@ db <- df[,c("SiteID", "Region", "Zone", "Environment.Type",
             "LIV00", "LIV20", "LIV40", "LIV60")]
 names(db)[4] <- "Type"
 
-# saveRDS(db, "database.rds")
-rm(exposure, stations, datetime, df, expStation, HealthSocio); gc()
+# Check whether health data were populated correctly
+HealthSocio$CVD60[which(HealthSocio$Year == "2014")]
+summary(db$CVD60[which(db$Year == "2014")], na.rm=TRUE)
+
+# saveRDS(db, "/var/data/Modelling/UK/database.rds")
+rm(exposure, stations, df, expStation, HealthSocio); gc()
 
 ################################################################################
 # MAKE A MAP OF THE ACTIVE STATIONS ############################################
@@ -612,24 +579,40 @@ rm(grouped, x, ind)
 # SPLIT THE DATASET INTO TRAINING AND TESTING SETS #############################
 ################################################################################
 
+# Pre-processing
 # db <- readRDS("database.rds")
+# Which columns do not contain NAs? colSums(is.na(db)) == 0
+# Remove records with NAs in weather variables
+db2 <- db[-which(is.na(db$ws)),]
+
+# Important HYPOTHESIS: ONLY CVD CAUSES ARE RELEVANT (TO BE VERIFIED!)
+# Take a note of the column numbers using as.data.frame(names(db2)), then
+# remove SiteID, LIVXX columns and CDV00-40.
+db2 <- db2[, -c(1,25:27, 29:32)]
+# remove NA from health variables
+db2 <- db2[-which(is.na(db2$CVD60)), ]
+# Re-order columns based on increasing number of NAs
+db2 <- droplevels(db2[, names(sort(colSums(is.na(db2))))])
+# saveRDS(db2, "/var/data/Modelling/UK/database_removedNAfromWeatherHealth.rds")
 
 # Training set contains all the data up to 2005, testing is data for 2006-14
-ind <- which(as.numeric(as.character(db$Year)) <= 2005)
+ind <- which(as.numeric(as.character(db2$Year)) <= 2005)
 
-training <- db[ind, ] # ~74% round(dim(training)[1]/dim(db)[1],2)
-testing <- db[-ind, ] # ~26% round(dim(testing)[1]/dim(db)[1],2)
+training <- db2[ind, ] # ~74% round(dim(training)[1]/dim(db2)[1],2)
+testing <- db2[-ind, ] # ~26% round(dim(testing)[1]/dim(db2)[1],2)
 
-saveRDS(training, "training.rds")
-saveRDS(testing, "testing.rds")
+saveRDS(training, "/var/data/Modelling/UK/training.rds")
+saveRDS(testing, "/var/data/Modelling/UK/testing.rds")
 
-rm(db, testing, ind); gc()
+rm(list=ls(all=TRUE)); gc()
 
 ################################################################################
 # PIE CHARTS ###################################################################
 ################################################################################
 
 library(ggplot2)
+
+training <- readRDS("/var/data/Modelling/UK/training.rds")
 
 # Pie Chart of Regions with Percentages
 x <- as.data.frame(table(training$Region))
@@ -686,35 +669,17 @@ rm(x, y, lblsX, lblsY, pctX, pctY, size, slicesX, slicesY)
 # install.packages(c("Matrix", "igraph", "Rcpp"))
 # install.packages("gRbase")
 # install.packages("gRain")
-# install.packages("bnlearn")
-
-library(bnlearn)
-
-# Load the training set
-# training <- readRDS("training.rds")
-
-# Which columns do not contain NAs? colSums(is.na(training)) == 0
-# Remove records with NAs in weather variables
-training <- training[-which(is.na(training$ws)),]
-
-### HYPOTHESIS: ONLY CVD CAUSES ARE RELEVANT ###################################
-# (THIS WILL BE VERIFIED AT THE END!)
-# Take a note of the column numbers using as.data.frame(names(training)), then
-# remove SiteID, LIVXX columns and CDV00-40.
-training <- training[, -c(1,25:27, 29:32)]
-# remove NA from health variables
-training <- training[-which(is.na(training$CVD60)), ]
-# Re-order columns based on increasing number of NAs
-training <- droplevels(training[, names(sort(colSums(is.na(training))))])
-# saveRDS(training, "database_BeforeEM_allObsFeatures.rds")
 
 ### CORE SIMULATION ############################################################
+# INstall dev version of bnlearn
 # install.packages("bnlearn_4.1-20160803.tar.gz", repos = NULL, type = "source")
 
 library(bnlearn)
 library(parallel)
 
-training<-readRDS("/var/data/Modelling/UK/database_BeforeEM_allObsFeatures.rds")
+# Load the training set
+# training<-readRDS("/var/data/Modelling/UK/database_BeforeEM_allObsFeatures.rds")
+training <- readRDS("/var/data/Modelling/UK/training.rds")
 
 # Define blacklist
 bl <- data.frame("from" = c(rep("Region",10),
@@ -962,21 +927,22 @@ compare(dag7,dag8, arcs = TRUE)
 
 # THERE IS NO ABSOLUTE CONVERGENCE ... WE TAKE THE LATEST NETWORK!
 dag <- dag8
-rm(dag1, dag2, dag3, dag4, dag5, dag6, dag7)
+
+rm(list=ls(all=TRUE))
 
 # PLOT NETWORK #################################################################
 # (work in progress!)
+library(bnlearn)
+DAG <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop8.rds")
+BN <- readRDS("/var/data/Modelling/UK/BN/currentModel_loop8.rds")
 
-dag <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop8.rds")
-
-source("https://bioconductor.org/biocLite.R")
-biocLite("Rgraphviz")
-
+# source("https://bioconductor.org/biocLite.R")
+# biocLite("Rgraphviz")
 library(graph)
 library(Rgraphviz)
 
-nodes <- names(dag$nodes)
-arcs <- dag$arcs
+nodes <- names(DAG$nodes)
+arcs <- DAG$arcs
 layout <- "dot"
 attrs <- list(node = list(fixedsize="FALSE", fillcolor=""),
               edge=list(color="grey"),
@@ -995,42 +961,71 @@ plot(graph.obj, attrs = attrs)
 dev.off()
 
 # Generate sub-graphs
-bn8 <- readRDS("/var/data/Modelling/UK/BN/currentModel_loop8.rds")
+BN$CVD60$parents # "Region" "Year"   "Season" "Month"
+BN$Region$parents
+BN$Year$parents
+BN$Season$parents
+BN$Month$parents
 
-bn8$CVD60$parents # "Region" "Year"   "Season" "Month"
-bn8$Region$parents
-bn8$Year$parents
-bn8$Season$parents
-bn8$Month$parents
-
-# subgraphCV <- function(dag, node){
+# subgraphCV <- function(DAG, node){
 #
 #   nAttrs <- list(color = c(eval(parse(text = paste0(node, "=", "'red'")))),
 #                  fontcolor = c(eval(parse(text = paste0(node, "=", "'red'")))))
 #   plot(subGraph(c(node,
-#                   eval(parse(text = paste0("bn8$", node, "$parents"))),
-#                   eval(parse(text = paste0("bn8$", node, "$children"))),
+#                   eval(parse(text = paste0("BN$", node, "$parents"))),
+#                   eval(parse(text = paste0("BN$", node, "$children"))),
 #                   graph.obj)), nodeAttrs=nAttrs)
 #
 # }
 
 nAttrs <- list(color = c("CVD60" = "red"), fontcolor = c("CVD60" = "red"))
-plot(subGraph(c("CVD60", bn8$CVD60$parents), graph.obj), nodeAttrs=nAttrs)
+plot(subGraph(c("CVD60", BN$CVD60$parents), graph.obj), nodeAttrs=nAttrs)
 
-plot(subGraph(c("Region", bn8$Region$children), graph.obj))
-plot(subGraph(c("Year", bn8$Year$children), graph.obj))
-plot(subGraph(c("Month", bn8$Month$children), graph.obj))
-#plot(subGraph(c("Season", bn8$Season$children), graph.obj))
-plot(subGraph(c("blh", bn8$blh$children), graph.obj))
+BN$CVD60$dlevels$Region[3]
+# What's the probability that CVD60 > 0.3, given the Region is London?
+bnlearn::cpquery(BN, CVD60 > 0.1, Region == BN$CVD60$dlevels$Region[3])
+bnlearn::cpquery(BN, CVD60 > 0.1, (Region == BN$CVD60$dlevels$Region[3] & 
+                                     Season == BN$CVD60$dlevels$Season[3]))
+bnlearn::cpquery(BN, CVD60 > 0.3, Region == BN$CVD60$dlevels$Region[1])
+bnlearn::cpquery(BN, CVD60 > 0.3, Region == BN$CVD60$dlevels$Region[2])
+bnlearn::cpquery(BN, CVD60 > 0.3, Region == BN$CVD60$dlevels$Region[4])
+bnlearn::cpquery(BN, CVD60 > 0.3, Region == BN$CVD60$dlevels$Region[5])
+bnlearn::cpquery(BN, CVD60 > 0.3, Region == BN$CVD60$dlevels$Region[6])
+bnlearn::cpquery(BN, CVD60 > 0.3, Region == BN$CVD60$dlevels$Region[7])
+bnlearn::cpquery(BN, CVD60 > 0.3, Region == BN$CVD60$dlevels$Region[8])
+bnlearn::cpquery(BN, CVD60 > 0.3, Region == BN$CVD60$dlevels$Region[9])
+
+
+x <- BN$CVD60$fitted.values
+bnlearn::cpquery(BN, CVD60 > 0.1, Region == BN$CVD60$dlevels$Region[3])
+
+
+x <- BN$pm2.5$coefficients
+
+y <- BN$pm2.5$configs
+
+
+
+nAttrs <- list(color = c("Region" = "red"), fontcolor = c("Region" = "red"))
+plot(subGraph(c("Region", BN$Region$children), graph.obj), nodeAttrs=nAttrs)
+
+nAttrs <- list(color = c("pm2.5" = "red"), fontcolor = c("pm2.5" = "red"))
+plot(subGraph(c("pm2.5", BN$pm2.5$parents, BN$pm2.5$children), graph.obj), nodeAttrs=nAttrs)
+
+plot(subGraph(c("Region", BN$Region$children), graph.obj))
+plot(subGraph(c("Year", BN$Year$children), graph.obj))
+plot(subGraph(c("Month", BN$Month$children), graph.obj))
+#plot(subGraph(c("Season", BN$Season$children), graph.obj))
+plot(subGraph(c("blh", BN$blh$children), graph.obj))
 
 nAttrs <- list(color = c("no2" = "red"), fontcolor = c("no2" = "red"))
-plot(subGraph(c("no2", bn8$no2$parents, bn8$no2$children), graph.obj), nodeAttrs=nAttrs)
-plot(subGraph(c("o3", bn8$o3$parents, bn8$o3$children), graph.obj), nodeAttrs=nAttrs)
+plot(subGraph(c("no2", BN$no2$parents, BN$no2$children), graph.obj), nodeAttrs=nAttrs)
+plot(subGraph(c("o3", BN$o3$parents, BN$o3$children), graph.obj), nodeAttrs=nAttrs)
 
-hlight <- list(nodes = nodes(dag), arcs = arcs(dag),
+hlight <- list(nodes = nodes(DAG), arcs = arcs(DAG),
                col = "grey", textCol = "grey")
 
-pp <- graphviz.plot(dag, highlight = hlight, layout = "dot",
+pp <- graphviz.plot(DAG, highlight = hlight, layout = "dot",
                     shape = "circle", main = NULL, sub = NULL)
 
 edgeRenderInfo(pp) <- list(col = c())
