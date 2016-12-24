@@ -3,7 +3,7 @@
 # a case study of the English regions                                          #
 #                                                                              #
 # Author: Claudia Vitolo                                                       #
-# Last updated: June 2016                                                      #
+# Last updated: December 2016                                                  #
 ################################################################################
 
 # Check for missing dependencies and install them
@@ -334,14 +334,14 @@ library("XLConnect")
 Deaths <- as.data.frame(matrix(NA, nrow = 0, ncol = 26))
 
 for (myfile in list.files(path = ".")){
-  
+
   print(myfile)
-  
+
   wb <- loadWorkbook(myfile)
   ws <- readWorksheet(wb, sheet = "Table 1", header = TRUE,
                       startRow = 8, startCol = 1, endCol = 26)
   Deaths <- rbind(Deaths, ws)
-  
+
 }
 
 # Separate data by causes
@@ -406,7 +406,7 @@ library("reshape2")
 populationEstimates <- readRDS("/var/data/GEO/PopulationEstimatesUK/PopulationEstimatesRegions1971_2014.rds")
 populationEstimates[,1:2] <- sapply(populationEstimates[,1:2], as.character)
 populationEstimates[,3:46] <- sapply(populationEstimates[,3:46], as.numeric)
-populationEstimates <- melt(data = populationEstimates[, 2:46], 
+populationEstimates <- melt(data = populationEstimates[, 2:46],
                             id.vars = "Geographic.Area")
 names(populationEstimates) <- c("Region", "Year", "YearlyPopEst")
 populationEstimates$Year <- substr(populationEstimates$Year, 5,8)
@@ -511,11 +511,14 @@ source_gist("33baa3a79c5cfef0f6df")
 # Load data
 stations <- readRDS("stations.rds")
 
-myMAP <- get_map("birmingham, uk",zoom=6)
+myMAP <- get_map("birmingham, uk", zoom=6, maptype = "toner-lite")
+
+pdf(file = "stations.pdf", width = 5, height = 5)
 ggmap(myMAP) +
   geom_point(data = data.frame(stations), aes(x = Longitude, y = Latitude),
-             alpha=0.5 , color = "red") +
+             alpha=0.3, color = "red") +
   xlab("Longitude") + ylab("Latitude")
+dev.off()
 
 rm(stations, myMAP, theme_map); gc()
 
@@ -657,18 +660,19 @@ lblsY <- paste(lblsY,"%",sep="") # ad % to labels
 
 # Default size
 size <- 480 # px
+cbPalette <- c("#000000", "#999999", "#E69F00", "#56B4E9", "#009E73", "#F0E442", "#0072B2", "#D55E00", "#CC79A7")
 
 # chart Regions
 png("Regions.png",
     width = size*3, height = size*2, units = "px", pointsize = 12, res=150)
-pie(slicesX, labels = lblsX, col=rainbow(length(lblsX)),
+pie(slicesX, labels = lblsX, col=cbPalette,
     main="Regions")
 dev.off()
 
 # Chart Types
 png(file = "Types.png",
     width = size*3, height = size*2, units = "px", pointsize = 12, res=150)
-pie(slicesY,labels = lblsY, col=rainbow(length(lblsY)),
+pie(slicesY,labels = lblsY, col=cbPalette[3:length(cbPalette)],
     main="Types")
 dev.off()
 
@@ -1004,7 +1008,7 @@ plot(subGraph(c("CVD60", BN$CVD60$parents), graph.obj), nodeAttrs=nAttrs)
 BN$CVD60$dlevels$Region[3]
 # What's the probability that CVD60 > 0.3, given the Region is London?
 bnlearn::cpquery(BN, CVD60 > 0.1, Region == BN$CVD60$dlevels$Region[3])
-bnlearn::cpquery(BN, CVD60 > 0.1, (Region == BN$CVD60$dlevels$Region[3] & 
+bnlearn::cpquery(BN, CVD60 > 0.1, (Region == BN$CVD60$dlevels$Region[3] &
                                      Season == BN$CVD60$dlevels$Season[3]))
 bnlearn::cpquery(BN, CVD60 > 0.3, Region == BN$CVD60$dlevels$Region[1])
 bnlearn::cpquery(BN, CVD60 > 0.3, Region == BN$CVD60$dlevels$Region[2])
