@@ -576,7 +576,7 @@ summary(x$uniqueYears) # (mean) 6 years
 rm(grouped, x, ind)
 
 ################################################################################
-# SPLIT THE DATASET INTO TRAINING AND TESTING SETS #############################
+# CLEAN UP THE DATABASE ########################################################
 ################################################################################
 
 # Pre-processing
@@ -594,6 +594,31 @@ db2 <- db2[-which(is.na(db2$CVD60)), ]
 # Re-order columns based on increasing number of NAs
 db2 <- droplevels(db2[, names(sort(colSums(is.na(db2))))])
 # saveRDS(db2, "/var/data/Modelling/UK/database_removedNAfromWeatherHealth.rds")
+# db2 <- readRDS("/var/data/Modelling/UK/database_removedNAfromWeatherHealth.rds")
+
+# Remove rows with negative (concentrations) artifacts
+summary(db2$t2m)
+min(db2$tp)
+db2$tp[which(db2$tp < 0)] <- 0
+min(db2$no2, na.rm = TRUE)
+db2$no2[which(db2$no2 < 0)] <- NA
+min(db2$o3, na.rm = TRUE)
+db2$o3[which(db2$o3 < 0)] <- NA
+min(db2$so2, na.rm = TRUE)
+db2$so2[which(db2$so2 < 0)] <- NA
+min(db2$pm10, na.rm = TRUE)
+db2$pm10[which(db2$pm10 < 0)] <- NA
+summary(db2$pm10)
+min(db2$pm2.5, na.rm = TRUE)
+db2$pm2.5[which(db2$pm2.5 < 0)] <- NA
+summary(db2$pm2.5)
+min(db2$co, na.rm = TRUE)
+db2$co[which(db2$co < 0)] <- NA
+summary(db2$co)
+
+################################################################################
+# SPLIT THE DATASET INTO TRAINING AND TESTING SETS #############################
+################################################################################
 
 # Training set contains all the data up to 2005, testing is data for 2006-14
 ind <- which(as.numeric(as.character(db2$Year)) <= 2005)
@@ -671,15 +696,12 @@ rm(x, y, lblsX, lblsY, pctX, pctY, size, slicesX, slicesY)
 # install.packages("gRain")
 
 ### CORE SIMULATION ############################################################
-# INstall dev version of bnlearn
+# Install dev version of bnlearn
 # install.packages("bnlearn_4.1-20160803.tar.gz", repos = NULL, type = "source")
-
 library(bnlearn)
 library(parallel)
 
-# Load the training set
-# training<-readRDS("/var/data/Modelling/UK/database_BeforeEM_allObsFeatures.rds")
-training <- readRDS("/var/data/Modelling/UK/training.rds")
+training<-readRDS("/var/data/Modelling/UK/training.rds")
 
 # Define blacklist
 bl <- data.frame("from" = c(rep("Region",10),
@@ -776,28 +798,23 @@ completeObservations <- training[rowsCompleteObservations, ]
 
 # Imputing Missing Data With Expectation – Maximization
 # initialise using the empty graph and complete observations
-# dag <- empty.graph(names(completeObservations))
-# bnTarget <- bn.fit(dag, completeObservations)        # node.ordering(bnTarget)
-loopNumber <- 1
-dag <- readRDS(paste("~/currentDAG_loop", loopNumber,".rds", sep = ""))
-bnTarget <- readRDS(paste("~/currentModel_loop", loopNumber,".rds", sep = ""))
+dag <- empty.graph(names(completeObservations))
+bnTarget <- bn.fit(dag, completeObservations)
 
 # which variables have missing values?
 which.missing <- names(which(sapply(training, function(x) anyNA(x))))
 
-# print(paste("Setting up a cluster using", detectCores() - 1, "cores"))
-# cl <- makeCluster(getOption("cl.cores", detectCores() - 1))
 print("Setting up a cluster")
 cl <- makeCluster(getOption("cl.cores", 15))
 invisible(clusterEvalQ(cl, library(bnlearn)))
 
 for(loopNumber in 1:10){
-
+  
   print(paste("********* Loop n.", loopNumber, sep = ""))
-
+  
   print("E: replacing all missing values with their (E)xpectation.")
   current <- training
-
+  
   print("Discard columns with zero or near-zero variance")
   col2remove <- c()
   for (nCol in names(which(sapply(current, class) == 'factor'))){
@@ -809,10 +826,10 @@ for(loopNumber in 1:10){
   }
   col2remove <- which(names(current) %in% col2remove)
   if (length(col2remove) >= 1) current <- current[, -col2remove]
-
+  
   print("iterate over all the variables with missing data.")
   res <- parSapply(cl, which.missing, function(myVar, current, bnTarget, n) {
-
+    
     # variables that do no have any missing value for the observations/variable
     # combination we are imputing in this iteration.
     missing.to.predict <- is.na(current[, myVar])
@@ -820,75 +837,75 @@ for(loopNumber in 1:10){
                                   function(x) !any(is.na(x) &
                                                      missing.to.predict))
     complete.predictors <- names(which(complete.predictors))
-
+    
     if (length(nbr(bnTarget, myVar)) == 0) {
-
+      
       # if the node has no neighbours, there is no information to propagate
       # from other variables: just simulate from the marginal distribution
       # using a reduced standard deviation to match that from predict().
       rnorm(length(which(missing.to.predict)), mean = bnTarget[[myVar]]$coef,
             sd = bnTarget[[myVar]]$sd / sqrt(n))
-
+      
     }
     else {
-
+      
       predict(object = bnTarget,
               node = myVar,
               data = current[missing.to.predict, complete.predictors],
               method = "bayes-lw", n = n)
-
+      
     }
-
+    
   }, current = current, bnTarget = bnTarget, n = 50, simplify = FALSE)
-
+  
   for (myVar in which.missing)
     current[is.na(current[, myVar]), myVar] = res[[myVar]]
-
+  
   print(paste("ensure we garbage-collect what we have used until this point,",
               "as we will not use it again."))
   invisible(clusterEvalQ(cl, gc()))
-
+  
   print(paste("M: learning the model that (M)aximises the score with the",
               "current data, after we have imputed all the missing data in all",
               "the variables."))
   imputedTraining <- data.frame(training[, 1:18, drop = FALSE],
                                 current[, which.missing, drop = FALSE])
-
+  
   print("split the data and learn a collection of networks.")
   splitted <- split(sample(nrow(imputedTraining)), seq(length(cl)))
-
+  
   models <- parLapply(cl, splitted, function(samples, data, bl, dag) {
-
+    
     hc(data[samples, , drop = FALSE], blacklist = bl, start = dag)
-
+    
   }, data = imputedTraining, bl = bl, dag = dag)
-
+  
   print("average the networks and make sure the result is completely directed.")
   dagNew <- averaged.network(custom.strength(models,
                                              nodes = names(imputedTraining)))
   dagNew <- cextend(dagNew)
-
+  
   print("Save the model at each iteration")
   saveRDS(object = dagNew,
-          file = paste("/var/data/Modelling/UK/BN/currentDAG_loop", loopNumber,".rds", sep = ""))
-
+          file = paste("~/currentDAG_loop", loopNumber,".rds", sep = ""))
+  
   print(paste("ensure we garbage-collect what we have used until this point,",
               "as we will not use it again."))
   invisible(clusterEvalQ(cl, gc()))
-
+  
   print("learn the parameters of the averaged network.")
   bnCurrent <- bn.fit(dagNew, imputedTraining, cluster = cl)
-
+  
   print("Save fitted bn at each iteration")
   saveRDS(object = bnCurrent,
-          file = paste("/var/data/Modelling/UK/BN/currentModel_loop", loopNumber,".rds", sep = ""))
-
+          file = paste("~/currentModel_loop", loopNumber,".rds", sep = ""))
+  
   print("Prepare for next iteration")
   dag <- dagNew
   bnTarget <- bnCurrent
-
+  
   rm(dagNew, bnCurrent)
-
+  
 }
 
 print("Stopping the cluster")
@@ -905,9 +922,11 @@ compare(dag1,dag2, arcs = TRUE)
 
 dag3 <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop3.rds")
 all.equal(dag2,dag3)
+compare(dag2,dag3, arcs = TRUE)
 
 dag4 <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop4.rds")
 all.equal(dag3,dag4)
+compare(dag3,dag4, arcs = TRUE)
 
 dag5 <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop5.rds")
 all.equal(dag4,dag5)
@@ -935,6 +954,7 @@ rm(list=ls(all=TRUE))
 library(bnlearn)
 DAG <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop8.rds")
 BN <- readRDS("/var/data/Modelling/UK/BN/currentModel_loop8.rds")
+training <- readRDS("/var/data/Modelling/UK/old/database_BeforeEM_allObsFeatures.rds")
 
 # source("https://bioconductor.org/biocLite.R")
 # biocLite("Rgraphviz")
@@ -1029,3 +1049,41 @@ pp <- graphviz.plot(DAG, highlight = hlight, layout = "dot",
                     shape = "circle", main = NULL, sub = NULL)
 
 edgeRenderInfo(pp) <- list(col = c())
+
+################################################################################
+# Analysis of residuals (TRAINING DATASET)
+# Calculate RMSE which indicate the average deviation of the estimates from the actual values
+for (i in 9:dim(training)[2]){
+  x <- BN[[i]]
+  RMSE <- sqrt(mean((x$fitted.values - training[,i])^2, na.rm = TRUE))
+  normRMSE <- RMSE/(max(training[,i], na.rm = TRUE)-min(training[,i], na.rm = TRUE))
+  print(paste(names(training)[i], round(normRMSE, 2)))
+}
+
+# Analysis of residuals (TESTING DATASET)
+testing <- readRDS("/var/data/Modelling/UK/testing.rds")
+print("Discard columns with zero or near-zero variance")
+col2remove <- c()
+for (nCol in names(which(sapply(testing, class) == 'factor'))){
+  stringCol <- paste("BN$", nCol, "$prob", sep = "")
+  levelsCol <- names(which( eval(parse(text = stringCol)) != 0 ))
+  if (!all(unique(testing[,nCol]) %in% levelsCol)) {
+    col2remove <- c(col2remove, nCol)
+  }
+}
+col2remove <- which(names(testing) %in% col2remove)
+names(testing)[col2remove]    # Disregard Year when predicting
+if (length(col2remove) >= 1) testing <- testing[, -col2remove]
+
+# Predict continuous variables from testing dataset
+# as.data.frame(names(testing))
+for (myVar in names(testing)[8:23]){
+  temp <- testing[complete.cases(testing[, -which(names(testing) == myVar)]),]
+  myCol <- which(names(temp) == myVar)
+  newCVD60 <- predict(object = BN, node = myVar,
+                      data = temp[, -myCol], method = "bayes-lw", n = 50)
+  myVarCol <- temp[,myCol]
+  RMSE <- sqrt(mean((newCVD60 - myVarCol)^2, na.rm = TRUE))
+  normRMSE <- RMSE/(max(myVarCol, na.rm = TRUE)-min(myVarCol, na.rm = TRUE))
+  print(paste(myVar, round(normRMSE, 2)))
+}
