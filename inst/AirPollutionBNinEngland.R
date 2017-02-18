@@ -935,7 +935,6 @@ dag <- dag8
 rm(list=ls(all=TRUE))
 
 # PLOT NETWORK #################################################################
-# (work in progress!)
 library(bnlearn)
 DAG <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop8.rds")
 BN <- readRDS("/var/data/Modelling/UK/BN/currentModel_loop8.rds")
@@ -964,30 +963,69 @@ svg(filename="BN_SVG.svg",
 plot(graph.obj, attrs = attrs)
 dev.off()
 
+# CALCULATE RESIDUALS ##########################################################
+library(bnlearn)
+library(forecast)
+
+# Load training set (to learn parameters)
+# training <- readRDS("/var/data/Modelling/UK/BN/training.rds")
+
+# Load test set (to give as evidence)
+testing <- readRDS("/var/data/Modelling/UK/BN/testing.rds")
+
+# BN structure learnt on training set data
+DAG <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop8.rds")
+
+# Model with learned parameters
+BN <- readRDS("/var/data/Modelling/UK/BN/currentModel_loop8.rds")
+
+# For continuous nodes
+continuousCols <- which(sapply(testing, is.numeric) == TRUE)
+
+for (myCol in continuousCols){
+
+  myVar <- names(testing)[myCol]
+
+  print(paste(myVar, "training accuracy:"))
+  accuracy(f = eval(parse(text=paste0("BN$", myVar, "$fitted.values"))),
+           x = training[, myVar])
+
+  print(paste(myVar, "testing accuracy:"))
+  pred <- predict(BN, myVar, testing)
+  accuracy(f = pred, x = testing[, myVar])
+
+}
+
+# ANOVA ########################################################################
+library(bnlearn)
+
+# BN structure learnt on training set data
+DAG <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop8.rds")
+# Model with learned parameters
+BN <- readRDS("/var/data/Modelling/UK/BN/currentModel_loop8.rds")
+
 # Generate sub-graphs
 BN$CVD60$parents # "Region" "Year"   "Season" "Month"
+nAttrs <- list(color = c("CVD60" = "red"), fontcolor = c("CVD60" = "red"))
+plot(subGraph(c("CVD60", BN$CVD60$parents), graph.obj), nodeAttrs=nAttrs)
+
+# Proportion of variance explained for variable CVD60 by its parents, given BN
+af <- anova(lm(CVD60 ~ Region + Year + Season + Month, data = training))
+1 - af["Residuals", "Sum Sq"]/sum(af[, "Sum Sq"])
+# repeat for the other variables
+
+# OTHER PLOTS ##################################################################
 BN$Region$parents
 BN$Year$parents
 BN$Season$parents
 BN$Month$parents
 
-# subgraphCV <- function(DAG, node){
-#
-#   nAttrs <- list(color = c(eval(parse(text = paste0(node, "=", "'red'")))),
-#                  fontcolor = c(eval(parse(text = paste0(node, "=", "'red'")))))
-#   plot(subGraph(c(node,
-#                   eval(parse(text = paste0("BN$", node, "$parents"))),
-#                   eval(parse(text = paste0("BN$", node, "$children"))),
-#                   graph.obj)), nodeAttrs=nAttrs)
-#
-# }
-
-nAttrs <- list(color = c("CVD60" = "red"), fontcolor = c("CVD60" = "red"))
-plot(subGraph(c("CVD60", BN$CVD60$parents), graph.obj), nodeAttrs=nAttrs)
-
-BN$CVD60$dlevels$Region[3]
+BN$CVD60$dlevels$Region[4] # "North East"
+BN$CVD60$dlevels$Region[3] # "Greater London Authority"
 # What's the probability that CVD60 > 0.3, given the Region is London?
-bnlearn::cpquery(BN, CVD60 > 0.1, Region == BN$CVD60$dlevels$Region[3])
+bnlearn::cpquery(BN, CVD60 > 0.3, Region == BN$CVD60$dlevels$Region[3])
+bnlearn::cpquery(BN, CVD60 > 0.3, Region == BN$CVD60$dlevels$Region[4])
+
 bnlearn::cpquery(BN, CVD60 > 0.1, (Region == BN$CVD60$dlevels$Region[3] &
                                      Season == BN$CVD60$dlevels$Season[3]))
 bnlearn::cpquery(BN, CVD60 > 0.3, Region == BN$CVD60$dlevels$Region[1])
@@ -1003,12 +1041,9 @@ bnlearn::cpquery(BN, CVD60 > 0.3, Region == BN$CVD60$dlevels$Region[9])
 x <- BN$CVD60$fitted.values
 bnlearn::cpquery(BN, CVD60 > 0.1, Region == BN$CVD60$dlevels$Region[3])
 
-
 x <- BN$pm2.5$coefficients
 
 y <- BN$pm2.5$configs
-
-
 
 nAttrs <- list(color = c("Region" = "red"), fontcolor = c("Region" = "red"))
 plot(subGraph(c("Region", BN$Region$children), graph.obj), nodeAttrs=nAttrs)
@@ -1033,3 +1068,34 @@ pp <- graphviz.plot(DAG, highlight = hlight, layout = "dot",
                     shape = "circle", main = NULL, sub = NULL)
 
 edgeRenderInfo(pp) <- list(col = c())
+
+################################################################################
+# CMIP5 SCENARIOS: https://pcmdi.llnl.gov/search/cmip5/
+# https://gisclimatechange.ucar.edu/gis-data
+
+# Mean monthly air temperature in 1999 (historical)
+historicalT <- read.table("/home/claudia/Dropbox/air_pollution_modelling/CMIP5_AirTemperature_1999/tas_all_1999_1999_20C3M-15.080569_6.01318_47.13007_60.99451.txt", sep = ",", header = TRUE)
+
+# Mean monthly air temperature in 2099 (High A2 scenario)
+highT <- read.table("/home/claudia/Dropbox/air_pollution_modelling/CMIP5_AirTemperature_2099_High/tas_all_2099_2099_SRESA2-15.080569_6.01318_47.13007_60.99451.txt", sep = ",", header = TRUE)
+
+plot(apply(highT[,3:14], 2, mean), ylim = c(min(historicalT[,3:14]), max(highT[,3:14])))
+points(apply(historicalT[,3:14], 2, mean), col = "red")
+
+# Mean increase: 3.4K
+mean(apply(highT[,3:14], 2, mean) - apply(historicalT[,3:14], 2, mean))
+
+###
+
+# Mean monthly total precipitation in 1999 (historical)
+historicalP <- read.table("/home/claudia/Dropbox/air_pollution_modelling/CMIP5_TotalPrecipitation_1999/ppt_all_1999_1999_20C3M-15.080569_6.01318_47.13007_60.99451.txt", sep = ",", header = TRUE)
+
+# Mean monthly total precipitation in 2099 (High A2 scenario)
+highP <- read.table("/home/claudia/Dropbox/air_pollution_modelling/CMIP5_TotalPrecipitation_2099_High/ppt_all_2099_2099_SRESA2-15.080569_6.01318_47.13007_60.99451.txt", sep = ",", header = TRUE)
+
+plot(apply(highP[,3:14], 2, mean), ylim = c(min(historicalP[,3:14]), max(highP[,3:14])))
+points(apply(historicalP[,3:14], 2, mean), col = "red")
+
+# Mean increase: 3.8mm
+mean(apply(highP[,3:14], 2, mean) - apply(historicalP[,3:14], 2, mean))
+
