@@ -587,7 +587,7 @@ rm(grouped, x, ind)
 # Remove records with NAs in weather variables
 db2 <- db[-which(is.na(db$ws)),]
 
-# Important HYPOTHESIS: ONLY CVD CAUSES ARE RELEVANT (TO BE VERIFIED!)
+# Important HYPOTHESIS: ONLY CVD CAUSES ARE RELEVANT
 # Take a note of the column numbers using as.data.frame(names(db2)), then
 # remove SiteID, LIVXX columns and CDV00-40.
 db2 <- db2[, -c(1,25:27, 29:32)]
@@ -953,7 +953,6 @@ dag <- dag8
 rm(list=ls(all=TRUE))
 
 # PLOT NETWORK #################################################################
-# (work in progress!)
 library(bnlearn)
 DAG <- readRDS("/var/data/Modelling/UK/BN/currentDAG_loop8.rds")
 BN <- readRDS("/var/data/Modelling/UK/BN/currentModel_loop8.rds")
@@ -989,17 +988,6 @@ BN$Region$parents
 BN$Year$parents
 BN$Season$parents
 BN$Month$parents
-
-# subgraphCV <- function(DAG, node){
-#
-#   nAttrs <- list(color = c(eval(parse(text = paste0(node, "=", "'red'")))),
-#                  fontcolor = c(eval(parse(text = paste0(node, "=", "'red'")))))
-#   plot(subGraph(c(node,
-#                   eval(parse(text = paste0("BN$", node, "$parents"))),
-#                   eval(parse(text = paste0("BN$", node, "$children"))),
-#                   graph.obj)), nodeAttrs=nAttrs)
-#
-# }
 
 nAttrs <- list(color = c("CVD60" = "red"), fontcolor = c("CVD60" = "red"))
 plot(subGraph(c("CVD60", BN$CVD60$parents), graph.obj), nodeAttrs=nAttrs)
@@ -1084,7 +1072,6 @@ newpm25max <-  mean(unlist(cpdist(fitted = BN, nodes = "pm2.5",  evidence = (t2m
 print(paste("MIN:", newpm25min, "(change", round(-100*(newpm25_noEvidence - newpm25min)/newpm25_noEvidence,2), "%)"))  # increase -0.01%
 print(paste("MAX:", newpm25max, "(change", round(-100*(newpm25_noEvidence - newpm25max)/newpm25_noEvidence,2), "%)"))  # increase 0%
 
-
 ################################################################################
 # Analysis of residuals (TRAINING DATASET)
 # Calculate RMSE which indicate the average deviation of the estimates from the actual values
@@ -1146,8 +1133,6 @@ bnlearn::cpquery(BN, CVD60 > 0.1, Region == BN$CVD60$dlevels$Region[3])
 x <- BN$pm2.5$coefficients
 
 y <- BN$pm2.5$configs
-
-
 
 nAttrs <- list(color = c("Region" = "red"), fontcolor = c("Region" = "red"))
 plot(subGraph(c("Region", BN$Region$children), graph.obj), nodeAttrs=nAttrs)
